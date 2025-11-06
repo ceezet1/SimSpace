@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Door, PlacedObject, ProjectState, Wall } from '../types';
+import { getMonitorAttachment, MonitorKey } from '../utils/monitors';
 
 interface ControlsProps {
   state: ProjectState;
@@ -19,11 +20,16 @@ function fmtUnit(units: ProjectState['units']): string {
 }
 
 export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
+  const softColors = ['#A36361', '#D3A29D', '#E8B298', '#EECC8C', '#BDD1C5', '#9EABA2', '#F2B8B5', '#F5D0C5', '#F7E2B7', '#DCEBDD', '#C8E1DC', '#EAD7F1'];
+  const vibrantColors = ['#2563eb', '#10b981', '#f43f5e', '#f59e0b', '#22d3ee', '#8b5cf6', '#ef4444', '#0ea5e9'];
+  const proColors = ['#475569', '#0ea5e9', '#64748b', '#94a3b8', '#334155', '#1e293b'];
+  const currentPalette = (state.theme === 'vibrant') ? vibrantColors : (state.theme === 'pro') ? proColors : softColors;
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [objName, setObjName] = useState('Desk');
   const [objW, setObjW] = useState(120);
   const [objD, setObjD] = useState(60);
   const [objColor, setObjColor] = useState('#E8B298');
+  const [tplMonitor, setTplMonitor] = useState<MonitorKey>('none');
 
   const [doorWall, setDoorWall] = useState<Wall>('north');
   const [doorOffset, setDoorOffset] = useState(0);
@@ -31,15 +37,14 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
 
   const roomWDisplay = useMemo(() => toDisplayUnits(state.room.widthCm, state.units), [state.room.widthCm, state.units]);
   const roomDDisplay = useMemo(() => toDisplayUnits(state.room.depthCm, state.units), [state.room.depthCm, state.units]);
-  const simWDisplay = useMemo(() => toDisplayUnits(state.simulator.widthCm, state.units), [state.simulator.widthCm, state.units]);
-  const simDDisplay = useMemo(() => toDisplayUnits(state.simulator.depthCm, state.units), [state.simulator.depthCm, state.units]);
+  
+
+  
 
   function updateRoom(w: number, d: number) {
     dispatch({ type: 'SET_ROOM', widthCm: fromDisplayUnits(w, state.units), depthCm: fromDisplayUnits(d, state.units) });
   }
-  function updateSim(w: number, d: number) {
-    dispatch({ type: 'SET_SIMULATOR', widthCm: fromDisplayUnits(w, state.units), depthCm: fromDisplayUnits(d, state.units) });
-  }
+  
 
   function addObject() {
     const widthCm = fromDisplayUnits(objW, state.units);
@@ -72,6 +77,22 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
     dispatch({ type: 'SET_DOORS', doors: state.doors.filter((d) => d.id !== id) });
   }
 
+  function addTemplate(name: string, widthCm: number, depthCm: number, color: string) {
+    const object: PlacedObject = {
+      id: `tpl_${name.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`,
+      name,
+      widthCm,
+      depthCm,
+      xCm: state.room.widthCm / 2,
+      yCm: state.room.depthCm / 2,
+      rotationDeg: 0,
+      color,
+      kind: 'simulator',
+      monitor: getMonitorAttachment(tplMonitor),
+    };
+    dispatch({ type: 'ADD_OBJECT', object });
+  }
+
   return (
     <div>
       <div className="section">
@@ -86,6 +107,18 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
             >
               <option value="metric">Metric (cm)</option>
               <option value="imperial">Imperial (in)</option>
+            </select>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="theme">Theme</label>
+            <select
+              id="theme"
+              value={state.theme || 'soft'}
+              onChange={(e) => dispatch({ type: 'SET_THEME', theme: e.target.value })}
+            >
+              <option value="soft">Soft</option>
+              <option value="vibrant">Vibrant</option>
+              <option value="pro">Pro</option>
             </select>
           </div>
           <div className="field">
@@ -144,6 +177,29 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
       </div>
 
       <div className="section">
+        <h3>Templates</h3>
+        <div className="row">
+          <div className="field">
+            <label className="label" htmlFor="tpl-monitor">Monitor setup</label>
+            <select id="tpl-monitor" value={tplMonitor} onChange={(e) => setTplMonitor(e.target.value as MonitorKey)}>
+              <option value="none">None</option>
+              <option value="single-49">Single 49"</option>
+              <option value="triple-42">Triple 42"</option>
+              <option value="triple-45c">Triple 45" curved</option>
+              <option value="triple-55">Triple 55"</option>
+              <option value="triple-65">Triple 65"</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          <button onClick={() => addTemplate('PRO AM', 80, 190, '#9EABA2')}>Add PRO AM (80×190cm)</button>
+          <button onClick={() => addTemplate('PRO', 100, 240, '#A36361')}>Add PRO (100×240cm)</button>
+        </div>
+      </div>
+
+      
+
+      <div className="section">
         <h3>Room</h3>
         <div className="row">
           <div className="field">
@@ -175,37 +231,7 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
         </div>
       </div>
 
-      <div className="section">
-        <h3>Simulator</h3>
-        <div className="row">
-          <div className="field">
-            <label className="label" htmlFor="sim-w">Width</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                id="sim-w"
-                type="number"
-                min={10}
-                value={Math.round(simWDisplay)}
-                onChange={(e) => updateSim(Number(e.target.value || 0), simDDisplay)}
-              />
-              <span className="badge">{fmtUnit(state.units)}</span>
-            </div>
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="sim-d">Depth</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                id="sim-d"
-                type="number"
-                min={10}
-                value={Math.round(simDDisplay)}
-                onChange={(e) => updateSim(simWDisplay, Number(e.target.value || 0))}
-              />
-              <span className="badge">{fmtUnit(state.units)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      
 
       <div className="section">
         <h3>Add Object</h3>
@@ -214,9 +240,21 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
             <label className="label" htmlFor="obj-name">Name</label>
             <input id="obj-name" value={objName} onChange={(e) => setObjName(e.target.value)} />
           </div>
-          <div className="field">
-            <label className="label" htmlFor="obj-color">Color</label>
-            <input id="obj-color" type="color" value={objColor} onChange={(e) => setObjColor(e.target.value)} />
+          <div className="field" style={{ gridColumn: '1 / span 2' }}>
+            <label className="label">Color</label>
+            <div className="swatch-grid" role="listbox" aria-label="Theme colors">
+              {currentPalette.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`swatch${objColor === c ? ' selected' : ''}`}
+                  style={{ background: c }}
+                  aria-label={`Color ${c}`}
+                  aria-pressed={objColor === c}
+                  onClick={() => setObjColor(c)}
+                />
+              ))}
+            </div>
           </div>
         </div>
         <div className="row">
@@ -298,10 +336,13 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
                 <span className="badge" style={{ background: o.color, color: '#0b0d12', borderColor: '#24314d' }}>●</span>
                 <strong>{o.name}</strong>
                 <span className="label">{Math.round(o.widthCm)}x{Math.round(o.depthCm)} cm</span>
+                {o.kind === 'simulator' && o.monitor && o.monitor.layout !== 'none' && (
+                  <span className="badge">{o.monitor.layout} {o.monitor.screenInches || ''}"</span>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={() => dispatch({ type: 'SELECT_OBJECT', id: o.id })}>Select</button>
-                <button className="danger" disabled={o.kind === 'simulator'} onClick={() => dispatch({ type: 'DELETE_OBJECT', id: o.id })}>Delete</button>
+                <button className="danger" disabled={o.id === 'simulator'} onClick={() => dispatch({ type: 'DELETE_OBJECT', id: o.id })}>Delete</button>
               </div>
             </div>
           ))}
@@ -321,24 +362,7 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
         </div>
       </div>
 
-      {state.selectedObjectId && (
-        <div className="section">
-          <h3>Selected Object</h3>
-          <div className="row">
-            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-              <label className="label">Rotation</label>
-              <input
-                type="range"
-                min={0}
-                max={359}
-                step={1}
-                value={state.objects.find(o => o.id === state.selectedObjectId)?.rotationDeg ?? 0}
-                onChange={(e) => state.selectedObjectId && dispatch({ type: 'UPDATE_OBJECT', id: state.selectedObjectId, updates: { rotationDeg: Number(e.target.value) } })}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Rotation controls moved to top bar; section removed */}
     </div>
   );
 };

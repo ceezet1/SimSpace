@@ -92,10 +92,10 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
     const startX = -((panX % stepPx) + stepPx) % stepPx;
     const startY = -((panY % stepPx) + stepPx) % stepPx;
     for (let x = startX; x < w; x += stepPx) {
-      elems.push(<line key={`gx-${x}`} x1={x} y1={0} x2={x} y2={h} stroke="#E6EFEA" strokeWidth={1} />);
+      elems.push(<line key={`gx-${x}`} x1={x} y1={0} x2={x} y2={h} stroke={'var(--grid)'} strokeWidth={1} />);
     }
     for (let y = startY; y < h; y += stepPx) {
-      elems.push(<line key={`gy-${y}`} x1={0} y1={y} x2={w} y2={y} stroke="#E6EFEA" strokeWidth={1} />);
+      elems.push(<line key={`gy-${y}`} x1={0} y1={y} x2={w} y2={y} stroke={'var(--grid)'} strokeWidth={1} />);
     }
     return elems;
   }
@@ -132,7 +132,7 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
             y1={y1}
             x2={x2}
             y2={y2}
-            stroke={isSel ? '#E8B298' : '#EECC8C'}
+            stroke={isSel ? 'var(--door-selected)' : 'var(--door)'}
             strokeWidth={Math.max(4, pxPerCm * 1.25)}
             strokeLinecap="round"
           />
@@ -159,14 +159,49 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
     return (
       <g key={o.id} data-object role="button" tabIndex={0} onPointerDown={(e) => startDragObject(o, e)} onPointerMove={onDragMove} onPointerUp={endDrag} onDoubleClick={() => dispatch({ type: 'SELECT_OBJECT', id: o.id })}>
         <g transform={transform} filter={isSel ? 'url(#objShadow)' : undefined}>
-          <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? '#A36361' : '#E7E3E1'} strokeWidth={isSel ? 2.5 : 1.25} />
-          <text x={10} y={20} fontSize={12} fill="#433a39" style={{ userSelect: 'none', fontWeight: 600 }}>{o.name}</text>
-          {isSel && (
-            <g>
-              <circle cx={w - 10} cy={10} r={10} fill="#ffffff" stroke="#A36361" strokeWidth={2} onClick={() => rotateSelected(15)} />
-              <text x={w - 14} y={14} fontSize={11} fill="#A36361">↻</text>
-            </g>
-          )}
+          <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'} strokeWidth={isSel ? 2.5 : 1.25} />
+          <text x={10} y={20} fontSize={12} fill={'var(--label-text)'} style={{ userSelect: 'none', fontWeight: 600 }}>{o.name}</text>
+          {/* Monitor attachment (renders in object-local coords so it rotates with the simulator) */}
+          {o.kind === 'simulator' && o.monitor && o.monitor.layout !== 'none' && (() => {
+            const mw = o.monitor.panelWidthCm * pxPerCm;
+            const standDepthPx = o.monitor.panelDepthCm * pxPerCm;
+            const barThicknessPx = 8 * pxPerCm; // visual thickness of monitor in top-down view (~8cm)
+            const startX = (w - mw) / 2;
+            // Special placements:
+            //  - PRO AM: monitors sit on top with ~20cm of simulator protruding
+            //  - PRO (exact): monitors sit on top with ~30cm buffer
+            const nameTrim = o.name.trim();
+            const isProAm = /pro\s*am/i.test(nameTrim);
+            const isProExact = /^pro$/i.test(nameTrim);
+            const startY = isProAm
+              ? 20 * pxPerCm
+              : isProExact
+                ? 30 * pxPerCm
+                : (-standDepthPx - barThicknessPx - 6);
+            const monitorFill = o.color;
+            const monitorStroke = isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)';
+            if (o.monitor.layout === 'single') {
+              return <rect x={startX} y={startY} width={mw} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />;
+            }
+            // triple: draw 3 panels with gaps
+            const gapPx = (o.monitor.gapCm ?? 2) * pxPerCm;
+            const panelW = (mw - 2 * gapPx) / 3;
+            const angle = o.monitor.angleDeg ?? 20;
+            return (
+              <g>
+                {/* Left panel rotated inward */}
+                <g transform={`rotate(${-angle}, ${startX + panelW}, ${startY + barThicknessPx / 2})`}>
+                  <rect x={startX} y={startY} width={panelW} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />
+                </g>
+                {/* Center panel */}
+                <rect x={startX + panelW + gapPx} y={startY} width={panelW} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.95} stroke={monitorStroke} strokeWidth={1} />
+                {/* Right panel rotated inward */}
+                <g transform={`rotate(${angle}, ${startX + 2 * (panelW + gapPx)}, ${startY + barThicknessPx / 2})`}>
+                  <rect x={startX + 2 * (panelW + gapPx)} y={startY} width={panelW} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />
+                </g>
+              </g>
+            );
+          })()}
         </g>
       </g>
     );
@@ -185,7 +220,15 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
     >
       <defs>
         <filter id="objShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#A36361" floodOpacity="0.35" />
+          {/* Use current theme accent for shadow */}
+          <feFlood flood-color="var(--accent)" flood-opacity="0.35" result="f" />
+          <feComposite in="f" in2="SourceAlpha" operator="in" result="shadow" />
+          <feOffset dx="0" dy="2" in="shadow" result="o" />
+          <feGaussianBlur stdDeviation="2" in="o" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
         </filter>
       </defs>
       {/* Grid */}
@@ -197,8 +240,8 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
         y={cmToPxY(0)}
         width={roomW * pxPerCm}
         height={roomD * pxPerCm}
-        fill="#ffffff"
-        stroke="#D3A29D"
+        fill={'var(--room-fill)'}
+        stroke={'var(--room-stroke)'}
         strokeWidth={2}
       />
 
@@ -210,23 +253,7 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
         {state.objects.map(renderObject)}
       </g>
 
-      {/* Overlay */}
-      <foreignObject x={10} y={10} width={360} height={48} className="canvas-overlay">
-        <div className="toolbar" style={{ pointerEvents: 'all' }}>
-          {selected && (
-            <>
-              <button onClick={() => rotateSelected(-15)}>Rotate -15°</button>
-              <button onClick={() => rotateSelected(15)}>Rotate +15°</button>
-              <button className="danger" onClick={() => dispatch({ type: 'DELETE_OBJECT', id: selected.id })}>Delete</button>
-            </>
-          )}
-          {!selected && state.selectedDoorId && (
-            <>
-              <button className="danger" onClick={() => dispatch({ type: 'SET_DOORS', doors: state.doors.filter((d) => d.id !== state.selectedDoorId) })}>Delete door</button>
-            </>
-          )}
-        </div>
-      </foreignObject>
+      {/* Overlay removed; rotation moved to top bar */}
 
       <foreignObject x={0} y={0} width="100%" height="100%" className="canvas-overlay">
         <div className="legend">

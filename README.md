@@ -1,4 +1,4 @@
-# Room Simulator Planner
+# SimSpace
 
 A minimal, intuitive 2D top-down planner to see how a racing simulator fits in your room. Add doors and other furniture to keep perspective. Built with React, TypeScript, and Vite.
 
