@@ -19,6 +19,7 @@ type Action =
   | { type: 'SELECT_OBJECT'; id: string | null }
   | { type: 'SELECT_DOOR'; id: string | null }
   | { type: 'SET_DOORS'; doors: ProjectState['doors'] }
+  | { type: 'SET_SHOW_DIMENSIONS'; show: boolean }
   | { type: 'LOAD'; state: ProjectState };
 
 const DEFAULT_STATE: ProjectState = {
@@ -31,6 +32,7 @@ const DEFAULT_STATE: ProjectState = {
   selectedObjectId: null,
   selectedDoorId: null,
   canvas: { pxPerCm: 1.5, panX: 0, panY: 0, snapCm: 5 },
+  showDimensions: false,
 };
 
 function ensureSimulatorObject(objects: PlacedObject[], sim: ProjectState['simulator'], room: ProjectState['room']): PlacedObject[] {
@@ -112,6 +114,8 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       return { ...state, selectedDoorId: action.id };
     case 'SET_DOORS':
       return { ...state, doors: action.doors };
+    case 'SET_SHOW_DIMENSIONS':
+      return { ...state, showDimensions: action.show };
     default:
       return state;
   }
@@ -268,21 +272,25 @@ export default function App(): React.ReactElement {
                     id="sim-angle"
                     type="range"
                     min={45}
-                    max={80}
+                    max={60}
                     step={1}
-                    value={selected.monitor.angleDeg ?? 60}
-                    onChange={(e) => dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: { ...selected.monitor!, angleDeg: Number(e.target.value) } } })}
+                    value={Math.min(60, selected.monitor.angleDeg ?? 60)}
+                    onChange={(e) => {
+                      const raw = Number(e.target.value);
+                      const clamped = Math.max(45, Math.min(60, isNaN(raw) ? 60 : raw));
+                      dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: { ...selected.monitor!, angleDeg: clamped } } });
+                    }}
                   />
                   <input
                     id="sim-angle-input"
                     type="number"
                     min={45}
-                    max={80}
+                    max={60}
                     step={1}
-                    value={selected.monitor.angleDeg ?? 60}
+                    value={Math.min(60, selected.monitor.angleDeg ?? 60)}
                     onChange={(e) => {
                       const raw = Number(e.target.value);
-                      const clamped = Math.max(45, Math.min(80, isNaN(raw) ? 60 : raw));
+                      const clamped = Math.max(45, Math.min(60, isNaN(raw) ? 60 : raw));
                       dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: { ...selected.monitor!, angleDeg: clamped } } });
                     }}
                     aria-label="Angle degrees"
@@ -312,6 +320,14 @@ export default function App(): React.ReactElement {
         <div className="v-sep" />
         {/* Right: zoom and grid */}
         <div className="topbar-right" aria-label="Canvas tools">
+          <label className="label" htmlFor="measure">Measurements</label>
+          <input
+            id="measure"
+            type="checkbox"
+            checked={!!state.showDimensions}
+            onChange={(e) => dispatch({ type: 'SET_SHOW_DIMENSIONS', show: e.target.checked })}
+          />
+          <span className="v-sep" />
           <label className="label" htmlFor="zoom">Zoom</label>
           <input
             id="zoom"

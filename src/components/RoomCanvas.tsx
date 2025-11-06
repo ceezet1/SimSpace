@@ -18,6 +18,10 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
   const { pxPerCm, panX, panY, snapCm } = state.canvas;
   const roomW = state.room.widthCm;
   const roomD = state.room.depthCm;
+  const unitsLabel = state.units === 'metric' ? 'cm' : 'in';
+  function toDisplayUnitsVal(cm: number): number {
+    return state.units === 'metric' ? cm : cm / 2.54;
+  }
 
   const widthPx = useMemo(() => svgRef.current?.clientWidth ?? 0, []);
   const heightPx = useMemo(() => svgRef.current?.clientHeight ?? 0, []);
@@ -161,6 +165,11 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
         <g transform={transform} filter={isSel ? 'url(#objShadow)' : undefined}>
           <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'} strokeWidth={isSel ? 2.5 : 1.25} />
           <text x={10} y={20} fontSize={12} fill={'var(--label-text)'} style={{ userSelect: 'none', fontWeight: 600 }}>{o.name}</text>
+          {state.showDimensions && (
+            <text x={10} y={34} fontSize={11} fill={'var(--muted)'} style={{ userSelect: 'none' }}>
+              {`${Math.round(toDisplayUnitsVal(o.widthCm))}x${Math.round(toDisplayUnitsVal(o.depthCm))} ${unitsLabel}`}
+            </text>
+          )}
           {/* Monitor attachment (renders in object-local coords so it rotates with the simulator) */}
           {o.kind === 'simulator' && o.monitor && o.monitor.layout !== 'none' && (() => {
             const mw = o.monitor.panelWidthCm * pxPerCm;
@@ -181,7 +190,19 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
             const monitorFill = o.color;
             const monitorStroke = isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)';
             if (o.monitor.layout === 'single') {
-              return <rect x={startX} y={startY} width={mw} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />;
+              return (
+                <g>
+                  <rect x={startX} y={startY} width={mw} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />
+                  {state.showDimensions && (
+                    <g>
+                      <line x1={startX} y1={startY - 6} x2={startX + mw} y2={startY - 6} stroke={'var(--muted)'} strokeWidth={1} />
+                      <text x={startX + mw / 2} y={startY - 8} fontSize={10} textAnchor="middle" fill={'var(--muted)'}>
+                        {`${Math.round(toDisplayUnitsVal(o.monitor.panelWidthCm))} ${unitsLabel}`}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
             }
             // triple: draw 3 panels with gaps
             const gapPx = (o.monitor.gapCm ?? 2) * pxPerCm;
@@ -199,10 +220,108 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
                 <g transform={`rotate(${angle}, ${startX + 2 * (panelW + gapPx)}, ${startY + barThicknessPx / 2})`}>
                   <rect x={startX + 2 * (panelW + gapPx)} y={startY} width={panelW} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />
                 </g>
+                {state.showDimensions && (
+                  <g>
+                    {(() => {
+                      // Compute rotated outer endpoints of side panels and measure between them
+                      const cy = startY + barThicknessPx / 2;
+                      // Left outer midpoint before rotation
+                      const l0x = startX; const l0y = cy;
+                      const lcx = startX + panelW; const lcy = cy; // left pivot (inner edge)
+                      const rad = (angle * Math.PI) / 180;
+                      const cos = Math.cos(-rad), sin = Math.sin(-rad);
+                      const ldx = l0x - lcx, ldy = l0y - lcy;
+                      const lx = lcx + (ldx * cos - ldy * sin);
+                      const ly = lcy + (ldx * sin + ldy * cos);
+
+                      // Right outer midpoint before rotation
+                      const rInnerX = startX + 2 * (panelW + gapPx);
+                      const r0x = rInnerX + panelW; const r0y = cy;
+                      const rcx = rInnerX; const rcy = cy; // right pivot (inner edge)
+                      const cosR = Math.cos(rad), sinR = Math.sin(rad);
+                      const rdx = r0x - rcx, rdy = r0y - rcy;
+                      const rx = rcx + (rdx * cosR - rdy * sinR);
+                      const ry = rcy + (rdx * sinR + rdy * cosR);
+
+                      const spanPx = Math.hypot(rx - lx, ry - ly);
+                      const spanCm = spanPx / pxPerCm;
+                      const mx = (lx + rx) / 2; const my = (ly + ry) / 2;
+
+                      return (
+                        <g>
+                          <line x1={lx} y1={ly - 6} x2={rx} y2={ry - 6} stroke={'var(--muted)'} strokeWidth={1} />
+                          <text x={mx} y={my - 8} fontSize={10} textAnchor="middle" fill={'var(--muted)'}>
+                            {`${Math.round(toDisplayUnitsVal(spanCm))} ${unitsLabel}`}
+                          </text>
+                        </g>
+                      );
+                    })()}
+                  </g>
+                )}
               </g>
             );
           })()}
         </g>
+        {state.showDimensions && (() => {
+          // Compute rotated rectangle corners in cm
+          const angle = (o.rotationDeg || 0) * Math.PI / 180;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          const hw = o.widthCm / 2;
+          const hd = o.depthCm / 2;
+          const localCorners: Array<[number, number]> = [
+            [-hw, -hd],
+            [ hw, -hd],
+            [ hw,  hd],
+            [-hw,  hd],
+          ];
+          const worldCorners = localCorners.map(([dx, dy]) => {
+            const x = o.xCm + dx * cos - dy * sin;
+            const y = o.yCm + dx * sin + dy * cos;
+            return { x, y };
+          });
+
+          let minX = Infinity, maxX = -Infinity, yAtMinX = o.yCm, yAtMaxX = o.yCm;
+          let minY = Infinity, maxY = -Infinity, xAtMinY = o.xCm, xAtMaxY = o.xCm;
+          for (const c of worldCorners) {
+            if (c.x < minX) { minX = c.x; yAtMinX = c.y; }
+            if (c.x > maxX) { maxX = c.x; yAtMaxX = c.y; }
+            if (c.y < minY) { minY = c.y; xAtMinY = c.x; }
+            if (c.y > maxY) { maxY = c.y; xAtMaxY = c.x; }
+          }
+
+          const distLeft = Math.max(0, minX - 0);
+          const distRight = Math.max(0, roomW - maxX);
+          const distTop = Math.max(0, minY - 0);
+          const distBottom = Math.max(0, roomD - maxY);
+
+          const stroke = 'var(--muted)';
+          const fontSize = 10;
+          return (
+            <g>
+              {/* Left distance from closest point */}
+              <line x1={cmToPxX(0)} y1={cmToPxY(yAtMinX)} x2={cmToPxX(minX)} y2={cmToPxY(yAtMinX)} stroke={stroke} strokeDasharray="4 3" strokeWidth={1} />
+              <text x={(cmToPxX(0) + cmToPxX(minX)) / 2} y={cmToPxY(yAtMinX) - 4} fontSize={fontSize} textAnchor="middle" fill={stroke}>
+                {`${Math.round(toDisplayUnitsVal(distLeft))} ${unitsLabel}`}
+              </text>
+              {/* Right distance from closest point */}
+              <line x1={cmToPxX(maxX)} y1={cmToPxY(yAtMaxX)} x2={cmToPxX(roomW)} y2={cmToPxY(yAtMaxX)} stroke={stroke} strokeDasharray="4 3" strokeWidth={1} />
+              <text x={(cmToPxX(maxX) + cmToPxX(roomW)) / 2} y={cmToPxY(yAtMaxX) - 4} fontSize={fontSize} textAnchor="middle" fill={stroke}>
+                {`${Math.round(toDisplayUnitsVal(distRight))} ${unitsLabel}`}
+              </text>
+              {/* Top distance from closest point */}
+              <line x1={cmToPxX(xAtMinY)} y1={cmToPxY(0)} x2={cmToPxX(xAtMinY)} y2={cmToPxY(minY)} stroke={stroke} strokeDasharray="4 3" strokeWidth={1} />
+              <text x={cmToPxX(xAtMinY) + 6} y={(cmToPxY(0) + cmToPxY(minY)) / 2} fontSize={fontSize} fill={stroke}>
+                {`${Math.round(toDisplayUnitsVal(distTop))} ${unitsLabel}`}
+              </text>
+              {/* Bottom distance from closest point */}
+              <line x1={cmToPxX(xAtMaxY)} y1={cmToPxY(maxY)} x2={cmToPxX(xAtMaxY)} y2={cmToPxY(roomD)} stroke={stroke} strokeDasharray="4 3" strokeWidth={1} />
+              <text x={cmToPxX(xAtMaxY) + 6} y={(cmToPxY(maxY) + cmToPxY(roomD)) / 2} fontSize={fontSize} fill={stroke}>
+                {`${Math.round(toDisplayUnitsVal(distBottom))} ${unitsLabel}`}
+              </text>
+            </g>
+          );
+        })()}
       </g>
     );
   }
@@ -244,6 +363,16 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
         stroke={'var(--room-stroke)'}
         strokeWidth={2}
       />
+      {state.showDimensions && (
+        <g>
+          <text x={cmToPxX(roomW / 2)} y={cmToPxY(0) + 12} fontSize={11} textAnchor="middle" fill={'var(--muted)'}>
+            {`${Math.round(toDisplayUnitsVal(roomW))} ${unitsLabel}`}
+          </text>
+          <text x={cmToPxX(0) + 6} y={cmToPxY(roomD / 2)} fontSize={11} fill={'var(--muted)'}>
+            {`${Math.round(toDisplayUnitsVal(roomD))} ${unitsLabel}`}
+          </text>
+        </g>
+      )}
 
       {/* Doors */}
       <g>{renderDoors(state.doors)}</g>

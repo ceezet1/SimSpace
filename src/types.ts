@@ -51,6 +51,7 @@ export interface ProjectState {
   selectedObjectId: string | null;
   selectedDoorId: string | null;
   canvas: CanvasState;
+  showDimensions?: boolean;
 }
 
 export type MonitorLayout = 'none' | 'single' | 'triple';
