@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useReducer } from 'react';
 import { loadState, saveState } from './utils/persistence';
-import { ProjectState, PlacedObject, ThemeName } from './types';
+import { ProjectState, PlacedObject, ThemeName, Door } from './types';
 import { Controls } from './components/Controls';
 import { RoomCanvas } from './components/RoomCanvas';
 import Logo from './assets/dome-logoblack.svg';
@@ -145,6 +145,21 @@ export default function App(): React.ReactElement {
   }, [state.theme]);
 
   const selected = useMemo(() => state.objects.find((o) => o.id === state.selectedObjectId) ?? null, [state.objects, state.selectedObjectId]);
+  const selectedDoor = useMemo(() => state.doors.find((d) => d.id === state.selectedDoorId) ?? null, [state.doors, state.selectedDoorId]);
+
+  // unit helpers for door controls
+  function toDisplayUnits(cm: number): number {
+    return state.units === 'metric' ? cm : cm / 2.54;
+  }
+  function fromDisplayUnits(val: number): number {
+    return state.units === 'metric' ? val : val * 2.54;
+  }
+
+  function updateSelectedDoor(updates: Partial<Door>): void {
+    if (!state.selectedDoorId) return;
+    const doors = state.doors.map((d) => (d.id === state.selectedDoorId ? { ...d, ...updates } : d));
+    dispatch({ type: 'SET_DOORS', doors });
+  }
 
   return (
     <div className="app">
@@ -155,8 +170,37 @@ export default function App(): React.ReactElement {
           <strong className="brand-name">SimSpace</strong>
         </div>
         <div className="v-sep" />
-        {/* Middle: object controls (monitor/display + angle), rotate at far right */}
+        {/* Middle: object controls (display + angle for simulators, door controls when door selected). Rotate slider pinned far right when object is selected */}
         <div className="topbar-middle" aria-label="Object controls">
+          {selectedDoor && (
+            <>
+              <label className="label" htmlFor="door-wall-top">Door</label>
+              <select id="door-wall-top" value={selectedDoor.wall} onChange={(e) => updateSelectedDoor({ wall: e.target.value as Door['wall'] })}>
+                <option value="north">North</option>
+                <option value="south">South</option>
+                <option value="east">East</option>
+                <option value="west">West</option>
+              </select>
+              <label className="label" htmlFor="door-offset-top">Offset</label>
+              <input
+                id="door-offset-top"
+                type="number"
+                min={0}
+                value={Math.round(toDisplayUnits(selectedDoor.offsetCm))}
+                onChange={(e) => updateSelectedDoor({ offsetCm: fromDisplayUnits(Number(e.target.value || 0)) })}
+              />
+              <span className="badge">{state.units === 'metric' ? 'cm' : 'in'}</span>
+              <label className="label" htmlFor="door-width-top">Width</label>
+              <input
+                id="door-width-top"
+                type="number"
+                min={1}
+                value={Math.round(toDisplayUnits(selectedDoor.widthCm))}
+                onChange={(e) => updateSelectedDoor({ widthCm: fromDisplayUnits(Number(e.target.value || 0)) })}
+              />
+              <span className="badge">{state.units === 'metric' ? 'cm' : 'in'}</span>
+            </>
+          )}
           {selected && selected.kind === 'simulator' && (
             <>
               <label className="label" htmlFor="sim-monitor">Displays</label>

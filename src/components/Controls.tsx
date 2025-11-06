@@ -192,8 +192,8 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
       <div className="section">
         <h3>Add Simulators</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-          <button onClick={() => addTemplate('PRO AM', 80, 190, currentPalette[5] || '#9EABA2')}>Add PRO AM (80×190cm)</button>
-          <button onClick={() => addTemplate('PRO', 100, 240, currentPalette[0] || '#A36361')}>Add PRO (100×240cm)</button>
+          <button onClick={() => addTemplate('PRO AM', 80, 190, currentPalette[5] || '#9EABA2')}>Add <strong>PRO AM</strong> (80×190cm)</button>
+          <button onClick={() => addTemplate('PRO', 100, 240, currentPalette[0] || '#A36361')}>Add <strong>PRO</strong> (100×240cm)</button>
         </div>
       </div>
 
@@ -243,7 +243,7 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
       </div>
 
       <div className="section">
-        <h3>Doors</h3>
+        <h3>Add Doors</h3>
         <div className="row">
           <div className="field">
             <label className="label" htmlFor="door-wall">Wall</label>
@@ -275,29 +275,16 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
           </div>
         </div>
 
-        <div className="list" style={{ marginTop: 10 }}>
-          {state.doors.length === 0 && <span className="label">No doors</span>}
-          {state.doors.map((d) => (
-            <div key={d.id} className="list-item">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="badge">{d.wall}</span>
-                <span>{Math.round(toDisplayUnits(d.widthCm, state.units))}{fmtUnit(state.units)}</span>
-                <span className="label">at</span>
-                <span>{Math.round(toDisplayUnits(d.offsetCm, state.units))}{fmtUnit(state.units)}</span>
-              </div>
-              <button className="danger" onClick={() => deleteDoor(d.id)}>Delete</button>
-            </div>
-          ))}
-        </div>
+        {/* Door list removed; doors are shown and managed in Objects & Doors and top bar */}
       </div>
 
       <div className="section">
-        <h3>Objects & Doors</h3>
+        <h3>Objects</h3>
         <div className="list">
           {state.objects.map((o) => (
-            <div key={o.id} className="list-item">
+            <div key={o.id} className={`list-item${state.selectedObjectId === o.id ? ' selected' : ''}`}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="badge" style={{ background: o.color, color: '#0b0d12', borderColor: '#24314d' }}>●</span>
+                <span className="color-swatch" style={{ background: o.color }} />
                 <strong>{o.name}</strong>
                 <span className="label">{Math.round(o.widthCm)}x{Math.round(o.depthCm)} cm</span>
                 {o.kind === 'simulator' && o.monitor && o.monitor.layout !== 'none' && (
@@ -305,20 +292,20 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
                 )}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => dispatch({ type: 'SELECT_OBJECT', id: o.id })}>Select</button>
+                <button onClick={() => { dispatch({ type: 'SELECT_OBJECT', id: o.id }); dispatch({ type: 'SELECT_DOOR', id: null }); }}>Select</button>
                 <button className="danger" disabled={o.id === 'simulator'} onClick={() => dispatch({ type: 'DELETE_OBJECT', id: o.id })}>Delete</button>
               </div>
             </div>
           ))}
           {state.doors.map((d) => (
-            <div key={d.id} className="list-item">
+            <div key={d.id} className={`list-item${state.selectedDoorId === d.id ? ' selected' : ''}`}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="badge">Door</span>
                 <strong>{d.wall}</strong>
                 <span className="label">{Math.round(d.widthCm)} cm</span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => dispatch({ type: 'SELECT_DOOR', id: d.id })}>Select</button>
+                <button onClick={() => { dispatch({ type: 'SELECT_DOOR', id: d.id }); dispatch({ type: 'SELECT_OBJECT', id: null }); }}>Select</button>
                 <button className="danger" onClick={() => dispatch({ type: 'SET_DOORS', doors: state.doors.filter((x) => x.id !== d.id) })}>Delete</button>
               </div>
             </div>
