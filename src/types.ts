@@ -1,5 +1,5 @@
 export type Units = 'metric' | 'imperial';
-export type ThemeName = 'soft' | 'vibrant' | 'pro' | 'default';
+export type ThemeName = 'soft' | 'vibrant' | 'slate' | 'default';
 
 export interface RoomDimensions {
   widthCm: number; // internal unit: centimeters

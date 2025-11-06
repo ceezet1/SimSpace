@@ -172,6 +172,47 @@ export default function App(): React.ReactElement {
         <div className="v-sep" />
         {/* Middle: object controls (display + angle for simulators, door controls when door selected). Rotate slider pinned far right when object is selected */}
         <div className="topbar-middle" aria-label="Object controls">
+          {selected && selected.kind !== 'simulator' && (
+            <>
+              <label className="label" htmlFor="obj-w-top">Width</label>
+              <input
+                id="obj-w-top"
+                type="number"
+                min={1}
+                value={Math.round(toDisplayUnits(selected.widthCm))}
+                onChange={(e) => dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { widthCm: fromDisplayUnits(Number(e.target.value || 0)) } })}
+              />
+              <span className="badge">{state.units === 'metric' ? 'cm' : 'in'}</span>
+              <label className="label" htmlFor="obj-d-top">Depth</label>
+              <input
+                id="obj-d-top"
+                type="number"
+                min={1}
+                value={Math.round(toDisplayUnits(selected.depthCm))}
+                onChange={(e) => dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { depthCm: fromDisplayUnits(Number(e.target.value || 0)) } })}
+              />
+              <span className="badge">{state.units === 'metric' ? 'cm' : 'in'}</span>
+              <label className="label">Color</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 12px)', gap: '4px 4px' }}>
+                {getPalette(state.theme).map((c, idx) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-label={`Color ${c}`}
+                    onClick={() => dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { color: c, themeColorIndex: idx } })}
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '999px',
+                      background: c,
+                      border: selected.color === c ? '2px solid var(--accent)' : '1px solid var(--border)'
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="v-sep" />
+            </>
+          )}
           {selectedDoor && (
             <>
               <label className="label" htmlFor="door-wall-top">Door</label>

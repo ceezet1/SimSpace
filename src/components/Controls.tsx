@@ -116,7 +116,7 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
               <option value="default">Default</option>
               <option value="soft">Soft</option>
               <option value="vibrant">Vibrant</option>
-              <option value="pro">Pro</option>
+              <option value="slate">Slate</option>
             </select>
           </div>
         </div>
@@ -128,7 +128,14 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = 'room-sim-project.json';
+              // ask user for filename; fallback to timestamp
+              const ts = new Date();
+              const defaultName = `simspace-${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, '0')}-${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}-${String(ts.getMinutes()).padStart(2, '0')}.json`;
+              const inputNameRaw = window.prompt('Enter filename for export (.json)', defaultName);
+              if (inputNameRaw === null) { URL.revokeObjectURL(url); return; }
+              let inputName = (inputNameRaw.trim() || defaultName).replace(/[\\/:*?"<>|]+/g, '-');
+              if (!/\.json$/i.test(inputName)) inputName += '.json';
+              a.download = inputName;
               a.click();
               URL.revokeObjectURL(url);
             }}

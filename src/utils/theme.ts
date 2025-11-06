@@ -9,7 +9,7 @@ export function getPalette(theme: ThemeName | undefined): string[] {
   switch (theme) {
     case 'vibrant':
       return VIBRANT;
-    case 'pro':
+    case 'slate':
       return PRO;
     case 'default':
       return DEFAULT_THEME;
