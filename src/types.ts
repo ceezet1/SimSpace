@@ -1,5 +1,5 @@
 export type Units = 'metric' | 'imperial';
-export type ThemeName = 'soft' | 'vibrant' | 'pro';
+export type ThemeName = 'soft' | 'vibrant' | 'pro' | 'default';
 
 export interface RoomDimensions {
   widthCm: number; // internal unit: centimeters
@@ -31,6 +31,7 @@ export interface PlacedObject {
   color: string;
   kind: 'simulator' | 'furniture';
   monitor?: MonitorAttachment; // optional monitor rig for simulators
+  themeColorIndex?: number; // if set, color follows current theme palette at this index
 }
 
 export interface CanvasState {

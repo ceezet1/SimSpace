@@ -5,6 +5,7 @@ import { Controls } from './components/Controls';
 import { RoomCanvas } from './components/RoomCanvas';
 import Logo from './assets/dome-logoblack.svg';
 import { getMonitorAttachment, MonitorKey } from './utils/monitors';
+import { getPalette } from './utils/theme';
 
 type Action =
   | { type: 'SET_UNITS'; units: ProjectState['units'] }
@@ -63,7 +64,16 @@ function reducer(state: ProjectState, action: Action): ProjectState {
     case 'SET_UNITS':
       return { ...state, units: action.units };
     case 'SET_THEME':
-      return { ...state, theme: action.theme };
+      // Update theme and re-apply colors for objects that follow theme palette via themeColorIndex
+      {
+        const palette = getPalette(action.theme);
+        const objects = state.objects.map((o) =>
+          o.themeColorIndex !== undefined
+            ? { ...o, color: palette[Math.max(0, Math.min(palette.length - 1, o.themeColorIndex))] || o.color }
+            : o
+        );
+        return { ...state, theme: action.theme, objects };
+      }
     case 'SET_ROOM': {
       const room = { widthCm: action.widthCm, depthCm: action.depthCm };
       return { ...state, room };
@@ -139,12 +149,66 @@ export default function App(): React.ReactElement {
   return (
     <div className="app">
       <div className="topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src={Logo} alt="DOME Simulators" style={{ height: 30, width: 'auto', marginLeft: 8, marginRight: 16 }} />
-          <strong>SimSpace</strong>
-          <span className="badge">Room planner</span>
+        {/* Left: brand */}
+        <div className="brand">
+          <div className="brand-logo" aria-hidden="true" />
+          <strong className="brand-name">SimSpace</strong>
         </div>
-        <div className="toolbar" aria-label="Canvas tools">
+        <div className="v-sep" />
+        {/* Middle: object controls (monitor/display + angle), rotate at far right */}
+        <div className="topbar-middle" aria-label="Object controls">
+          {selected && selected.kind === 'simulator' && (
+            <>
+              <label className="label" htmlFor="sim-monitor">Displays</label>
+              <select
+                id="sim-monitor"
+                value={(selected.monitor && selected.monitor.layout !== 'none') ? (`${selected.monitor.layout}-${selected.monitor.screenInches ?? 49}` as MonitorKey) : 'none'}
+                onChange={(e) => {
+                  const key = e.target.value as MonitorKey;
+                  const attach = getMonitorAttachment(key);
+                  dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: attach } });
+                }}
+              >
+                <option value="none">None</option>
+                <option value="single-49">Single 49"</option>
+                <option value="triple-42">Triple 42"</option>
+                <option value="triple-45c">Triple 45" curved</option>
+                <option value="triple-55">Triple 55"</option>
+                <option value="triple-65">Triple 65"</option>
+              </select>
+              {selected.monitor && selected.monitor.layout === 'triple' && (
+                <>
+                  <label className="label" htmlFor="sim-angle">Display angle</label>
+                  <input
+                    id="sim-angle"
+                    type="range"
+                    min={45}
+                    max={80}
+                    step={1}
+                    value={selected.monitor.angleDeg ?? 60}
+                    onChange={(e) => dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: { ...selected.monitor!, angleDeg: Number(e.target.value) } } })}
+                  />
+                  <input
+                    id="sim-angle-input"
+                    type="number"
+                    min={45}
+                    max={80}
+                    step={1}
+                    value={selected.monitor.angleDeg ?? 60}
+                    onChange={(e) => {
+                      const raw = Number(e.target.value);
+                      const clamped = Math.max(45, Math.min(80, isNaN(raw) ? 60 : raw));
+                      dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: { ...selected.monitor!, angleDeg: clamped } } });
+                    }}
+                    aria-label="Angle degrees"
+                    style={{ width: 64, marginLeft: 8 }}
+                  />
+                  <span className="badge">°</span>
+                </>
+              )}
+            </>
+          )}
+          <div className="flex-spacer" />
           {selected && (
             <>
               <label className="label" htmlFor="rotate">Rotate</label>
@@ -157,62 +221,12 @@ export default function App(): React.ReactElement {
                 value={selected.rotationDeg}
                 onChange={(e) => dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { rotationDeg: Number(e.target.value) } })}
               />
-              {/* small separator */}
-              <span style={{ width: 1, height: 24, background: 'var(--border)', display: 'inline-block', margin: '0 12px' }} />
-              {selected.kind === 'simulator' && (
-                <>
-                  <label className="label" htmlFor="sim-monitor">Monitors</label>
-                  <select
-                    id="sim-monitor"
-                    value={(selected.monitor && selected.monitor.layout !== 'none') ? (`${selected.monitor.layout}-${selected.monitor.screenInches ?? 49}` as MonitorKey) : 'none'}
-                    onChange={(e) => {
-                      const key = e.target.value as MonitorKey;
-                      const attach = getMonitorAttachment(key);
-                      dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: attach } });
-                    }}
-                  >
-                    <option value="none">None</option>
-                    <option value="single-49">Single 49"</option>
-                    <option value="triple-42">Triple 42"</option>
-                    <option value="triple-45c">Triple 45" curved</option>
-                    <option value="triple-55">Triple 55"</option>
-                    <option value="triple-65">Triple 65"</option>
-                  </select>
-                  {selected.monitor && selected.monitor.layout === 'triple' && (
-                    <>
-                      <label className="label" htmlFor="sim-angle">Angle</label>
-                      <input
-                        id="sim-angle"
-                        type="range"
-                        min={45}
-                        max={80}
-                        step={1}
-                        value={selected.monitor.angleDeg ?? 60}
-                        onChange={(e) => dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: { ...selected.monitor!, angleDeg: Number(e.target.value) } } })}
-                      />
-                      <input
-                        id="sim-angle-input"
-                        type="number"
-                        min={45}
-                        max={80}
-                        step={1}
-                        value={selected.monitor.angleDeg ?? 60}
-                        onChange={(e) => {
-                          const raw = Number(e.target.value);
-                          const clamped = Math.max(45, Math.min(80, isNaN(raw) ? 60 : raw));
-                          dispatch({ type: 'UPDATE_OBJECT', id: selected.id, updates: { monitor: { ...selected.monitor!, angleDeg: clamped } } });
-                        }}
-                        aria-label="Angle degrees"
-                        style={{ width: 64, marginLeft: 8 }}
-                      />
-                      <span className="badge">°</span>
-                    </>
-                  )}
-                </>
-              )}
-              <span style={{ width: 1, height: 24, background: 'var(--border)', display: 'inline-block', margin: '0 12px' }} />
             </>
           )}
+        </div>
+        <div className="v-sep" />
+        {/* Right: zoom and grid */}
+        <div className="topbar-right" aria-label="Canvas tools">
           <label className="label" htmlFor="zoom">Zoom</label>
           <input
             id="zoom"

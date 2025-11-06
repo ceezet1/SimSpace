@@ -19,6 +19,8 @@
   --door-selected: #0ea5e9;
   --label-text: #1f2937;
   --shadow-1: 0 1px 2px rgba(24,36,57,0.06), 0 8px 24px rgba(24,36,57,0.06);
+  --button-primary-bg: var(--accent);
+  --button-primary-contrast: #ffffff;
 }
 
 /* Pastel theme (current) */
@@ -65,6 +67,30 @@ body[data-theme="vibrant"] {
   --label-text: #1f2937;
 }
 
+/* Default theme (user-specified colors) */
+body[data-theme="default"] {
+  --bg: #ffffff;             /* pure white */
+  --panel: #ffffff;          /* pure white */
+  --panel-2: #ffffff;        /* pure white */
+  --border: #9a9a9a;         /* grey borders */
+  --text: #000000;           /* pure black */
+  --muted: #6b6b6b;          /* medium grey */
+  --accent: #000000;         /* brand/logo + SIMSPACE pure black */
+  --accent-2: #58dda1;       /* mint */
+  --danger: #ff6b6b;         /* keep readable danger */
+  --grid: #f0f0f0;           /* very light grey for grid lines */
+  --canvas-bg: #ffffff;      /* white */
+  --room-fill: #ffffff;      /* white room */
+  --room-stroke: #9a9a9a;    /* grey outline */
+  --object-stroke: #9a9a9a;  /* grey object outline */
+  --object-stroke-selected: #ffc800; /* highlight with yellow */
+  --door: #58dda1;           /* mint doors */
+  --door-selected: #ffc800;  /* selected door */
+  --label-text: #000000;     /* black labels */
+  --button-primary-bg: #ffc800; /* buttons use provided yellow */
+  --button-primary-contrast: #000000; /* black text on yellow */
+}
+
 /* Fashion theme removed */
 
 * { box-sizing: border-box; }
@@ -79,7 +105,7 @@ body {
 .app {
   display: grid;
   grid-template-columns: 320px 1fr;
-  grid-template-rows: 56px 1fr;
+  grid-template-rows: auto 1fr; /* let topbar define its own height to avoid overlap */
   grid-template-areas:
     "topbar topbar"
     "sidebar canvas";
@@ -95,19 +121,62 @@ body {
   border-bottom: 1px solid var(--border);
   background: rgba(255,255,255,0.9);
   backdrop-filter: blur(8px);
-  height: 64px;
+  height: 96px;
   box-shadow: var(--shadow-1);
 }
 
+/* Themed brand (logo + name) */
+.brand { display: flex; align-items: center; gap: 18px; height: 100%; }
+.brand-logo {
+  width: 90px; height: 90px; border-radius: 12px;
+  background: var(--accent);
+  -webkit-mask: url('/src/assets/dome-logoblack.svg') center / contain no-repeat;
+  mask: url('/src/assets/dome-logoblack.svg') center / contain no-repeat;
+  margin-left: 16px; margin-right: 16px;
+  display: block;
+  flex: 0 0 90px; /* prevent shrinking when text size changes */
+}
+.brand-name {
+  color: var(--accent);
+  font-family: 'Roboto Condensed', Roboto, Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial;
+  font-weight: 300;
+  font-size: 26px;
+  letter-spacing: .03em;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  text-transform: uppercase;
+  display: flex; align-items: center;
+  margin-right: 16px;
+}
+
+.topbar-middle {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+.flex-spacer { flex: 1 1 auto; }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.v-sep { width: 1px; height: 60%; background: var(--border); opacity: .7; margin: 0 10px; }
+
 .sidebar {
   grid-area: sidebar;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   border-right: 1px solid var(--border);
   background: var(--panel);
   padding: 12px;
+  padding-bottom: 24px; /* extra space at bottom */
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .canvas {
@@ -123,6 +192,7 @@ body {
   border-radius: 16px;
   box-shadow: var(--shadow-1);
 }
+.sidebar .section + .section { margin-top: 16px; }
 .section h3 {
   margin: 0 0 10px 0;
   font-size: 13px;
@@ -194,7 +264,7 @@ button {
   box-shadow: var(--shadow-1);
   transition: background .15s ease, transform .05s ease;
 }
-button.primary { background: var(--accent); border-color: #7ba4e6; color: #fff; border-width: 1px; }
+button.primary { background: var(--button-primary-bg); border-color: var(--button-primary-bg); color: var(--button-primary-contrast); border-width: 1px; }
 button.ghost { background: transparent; }
 button.danger { background: var(--danger); border-color: #e18c90; color: #fff; }
 button:hover { filter: brightness(0.98); }
@@ -221,6 +291,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -228,6 +299,15 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   box-shadow: var(--shadow-1);
   border-left: 4px solid var(--accent-2);
 }
+
+/* Prevent content overflow inside list items */
+.list-item > :first-child { flex: 1 1 auto; min-width: 0; }
+.list-item > :last-child { flex-shrink: 0; }
+/* Allow wrapping and improve readability */
+.list .list-item > div:first-child { flex-wrap: wrap; gap: 6px 8px; align-items: baseline; }
+.list-item strong { font-size: 13px; line-height: 1.2; white-space: normal; word-break: break-word; }
+.list-item .label { font-size: 11px; line-height: 1.2; white-space: normal; word-break: break-word; }
+.list-item .badge { white-space: nowrap; }
 
 .badge {
   font-size: 11px;
