@@ -160,13 +160,31 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
     const d = o.depthCm * pxPerCm;
     const transform = `translate(${x - w / 2}, ${y - d / 2}) rotate(${o.rotationDeg}, ${w / 2}, ${d / 2})`;
     const isSel = state.selectedObjectId === o.id;
+    function getContrastText(hex: string): string {
+      // Normalize hex
+      let h = hex.trim().replace('#', '');
+      if (h.length === 3) {
+        h = h.split('').map((c) => c + c).join('');
+      }
+      const num = parseInt(h, 16);
+      if (Number.isNaN(num) || (h.length !== 6)) {
+        return 'var(--label-text)';
+      }
+      const r = (num >> 16) & 0xff;
+      const g = (num >> 8) & 0xff;
+      const b = num & 0xff;
+      // YIQ formula for contrast
+      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+      return yiq >= 186 ? '#000000' : '#ffffff';
+    }
+    const textOnObj = getContrastText(o.color);
     return (
       <g key={o.id} data-object role="button" tabIndex={0} onPointerDown={(e) => startDragObject(o, e)} onPointerMove={onDragMove} onPointerUp={endDrag} onDoubleClick={() => dispatch({ type: 'SELECT_OBJECT', id: o.id })}>
         <g transform={transform} filter={isSel ? 'url(#objShadow)' : undefined}>
           <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'} strokeWidth={isSel ? 2.5 : 1.25} />
-          <text x={10} y={20} fontSize={12} fill={'var(--label-text)'} style={{ userSelect: 'none', fontWeight: 600 }}>{o.name}</text>
+          <text x={10} y={20} fontSize={12} fill={textOnObj} style={{ userSelect: 'none', fontWeight: 600 }}>{o.name}</text>
           {state.showDimensions && (
-            <text x={10} y={34} fontSize={11} fill={'var(--muted)'} style={{ userSelect: 'none' }}>
+            <text x={10} y={34} fontSize={11} fill={textOnObj} style={{ userSelect: 'none' }}>
               {`${Math.round(toDisplayUnitsVal(o.widthCm))}x${Math.round(toDisplayUnitsVal(o.depthCm))} ${unitsLabel}`}
             </text>
           )}

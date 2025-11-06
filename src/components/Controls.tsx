@@ -120,6 +120,19 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
             </select>
           </div>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+          <label className="label" htmlFor="grid-snap">Grid</label>
+          <input
+            id="grid-snap"
+            type="range"
+            min={1}
+            max={50}
+            step={1}
+            value={state.canvas.snapCm}
+            onChange={(e) => dispatch({ type: 'SET_CANVAS', snapCm: Number(e.target.value) })}
+          />
+          <span className="badge">{state.canvas.snapCm} cm</span>
+        </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
           <button
             className="ghost"

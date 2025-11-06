@@ -251,7 +251,7 @@ export default function App(): React.ReactElement {
               <label className="label" htmlFor="sim-monitor">Displays</label>
               <select
                 id="sim-monitor"
-                value={(selected.monitor && selected.monitor.layout !== 'none') ? (`${selected.monitor.layout}-${selected.monitor.screenInches ?? 49}` as MonitorKey) : 'none'}
+                value={selected.monitor?.presetKey as MonitorKey || 'none'}
                 onChange={(e) => {
                   const key = e.target.value as MonitorKey;
                   const attach = getMonitorAttachment(key);
@@ -337,16 +337,6 @@ export default function App(): React.ReactElement {
             step={0.1}
             value={state.canvas.pxPerCm}
             onChange={(e) => dispatch({ type: 'SET_CANVAS', pxPerCm: Number(e.target.value) })}
-          />
-          <label className="label" htmlFor="snap">Grid</label>
-          <input
-            id="snap"
-            type="range"
-            min={1}
-            max={50}
-            step={1}
-            value={state.canvas.snapCm}
-            onChange={(e) => dispatch({ type: 'SET_CANVAS', snapCm: Number(e.target.value) })}
           />
         </div>
       </div>

@@ -63,6 +63,7 @@ export interface MonitorAttachment {
   panelDepthCm: number; // depth footprint (stand/rig)
   gapCm?: number; // bezel gap for triples (per gap)
   angleDeg?: number; // for triple rigs: side panel angle relative to center
+  presetKey?: string; // preserves the original preset key to map back to UI
 }
 
 

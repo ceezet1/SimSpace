@@ -1,6 +1,30 @@
 # SimSpace
 
-Room/simulator top‑down planner built with React + TypeScript + Vite. This README captures the full spec and decisions so the app can be recreated from scratch quickly.
+Room/simulator top‑down planner built with React + TypeScript + Vite.
+
+## Prerequisites
+
+- Node.js 18+ and npm
+  - Official installer (recommended): [Node.js LTS](https://nodejs.org/en/download)
+  - macOS (Homebrew): `brew install node`
+  - Using nvm:
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+    # restart terminal, then:
+    nvm install --lts
+    nvm use --lts
+    ```
+
+## Quick start
+
+Local (dev):
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:5173
 
 ## Core capabilities
 
@@ -14,30 +38,32 @@ Room/simulator top‑down planner built with React + TypeScript + Vite. This REA
 - Per‑simulator display rigs (top‑down visualization) with presets:
   - Single 49"
   - Triple 42" / Triple 45" curved / Triple 55" / Triple 65"
-  - Triple rigs have adjustable side panel angle (45°–80°)
+  - Triple rigs have adjustable side panel angle (45°–60°, default 60°)
 - Display placement rules (top‑down):
   - PRO AM: monitors sit on top of the simulator with ~20 cm of the simulator protruding forward
   - PRO: monitors sit on top with ~30 cm buffer
   - Others: offset in front using stand depth
-- Displays adopt the simulator's color and outline (selected vs normal)
-- Themeable UI with 3 presets: Soft, Vibrant, Pro
+- Displays adopt the simulator’s color and outline (selected vs normal)
+- Themeable UI with 4 presets: Default (dark), Soft, Vibrant, Slate
 - Pastel swatch redesigned as Soft palette; swatches change with theme
 - Import/Export project JSON; auto‑save to localStorage
+ - Measurements toggle shows room size, object sizes, nearest wall distances; simulator display span respects angle
 
 ## UX overview
 
 Top bar
-- Rotation slider for selected object (leftmost)
-- If a simulator is selected: Displays dropdown and, for triple rigs, an Angle slider (45°–80°) and a numeric input for exact degrees
-- Zoom slider
-- Grid size slider (snap granularity)
+- Left: brand
+- Middle (contextual):
+  - Rotation slider (for selected item)
+  - If simulator selected: Displays dropdown and, for triple rigs, Angle slider (45°–60°) + numeric input
+- Right: Measurements toggle and Zoom slider
 
 Left sidebar
-- Project: Units selector (cm/in), Theme selector (Soft/Vibrant/Pro), Grid size numeric
-- Project Data: Import/Export
-- Templates: Display setup selector (applies to new templates), buttons to add PRO AM and PRO
-- Doors: add/list/delete
-- Objects & Doors: list of items with Select/Delete
+- Project: Units (cm/in), Theme (Default/Soft/Vibrant/Slate), Grid size slider, Import/Export
+- Room: width/depth
+- Add Simulators: add PRO AM and PRO
+- Add Doors: add new doors
+- Objects: list of items (objects and doors) with Select/Delete
 
 Canvas interactions
 - Drag background to pan
@@ -76,9 +102,10 @@ Canvas interactions
 
 ## Theme system
 
+- Default (dark): dark panels/background, yellow accent; white brand text/logo
 - Soft (formerly “Pastel”): warm palette; grid #E6EFEA; canvas #FBFAF7
 - Vibrant: higher contrast (blue/emerald accents)
-- Pro: neutral/slate; clean, understated accents
+- Slate: neutral/slate; clean, understated accents
 - All styling uses CSS variables on body[data-theme] for: bg, panel, panel-2, border, text, muted, accent, accent-2, danger, grid, canvas-bg, room-fill, room-stroke, object-stroke, object-stroke-selected, door, door-selected, label-text
 - Range sliders themed using accent-color and custom track/thumb styles
 
@@ -106,26 +133,14 @@ Canvas interactions
 ## Build & run
 
 ```bash
-# install
 npm install
-# dev
 npm run dev
-# build
+# optional
 npm run build
-# preview
 npm run preview
 ```
 
-Open http://localhost:5173
-
-## Deploy / embed
-
-- Deploy to Netlify/Vercel; set build `npm run build`, output `dist/`
-- Embed into WordPress with an iframe to the deployed URL, e.g.:
-
-```html
-<iframe src="https://YOUR-APP-URL" style="width:100%;height:900px;border:0;border-radius:12px" loading="lazy"></iframe>
-```
+<!-- Deployment details intentionally omitted -->
 
 ## Rebuild checklist (from scratch)
 

@@ -67,27 +67,27 @@ body[data-theme="vibrant"] {
   --label-text: #1f2937;
 }
 
-/* Default theme (user-specified colors) */
+/* Default theme (now dark) */
 body[data-theme="default"] {
-  --bg: #ffffff;             /* pure white */
-  --panel: #ffffff;          /* pure white */
-  --panel-2: #ffffff;        /* pure white */
-  --border: #9a9a9a;         /* grey borders */
-  --text: #000000;           /* pure black */
-  --muted: #6b6b6b;          /* medium grey */
-  --accent: #000000;         /* brand/logo + SIMSPACE pure black */
+  --bg: #0f1115;             /* dark background */
+  --panel: #151a21;          /* dark panel */
+  --panel-2: #1b212a;        /* darker input bg */
+  --border: #2b3440;         /* subtle border */
+  --text: #e6e8eb;           /* light text */
+  --muted: #9aa4b2;          /* muted on dark */
+  --accent: #ffc800;         /* brand accent: yellow */
   --accent-2: #58dda1;       /* mint */
-  --danger: #ff6b6b;         /* keep readable danger */
-  --grid: #f0f0f0;           /* very light grey for grid lines */
-  --canvas-bg: #ffffff;      /* white */
-  --room-fill: #ffffff;      /* white room */
-  --room-stroke: #9a9a9a;    /* grey outline */
-  --object-stroke: #9a9a9a;  /* grey object outline */
+  --danger: #ef4444;         /* red */
+  --grid: #252c36;           /* dark grid */
+  --canvas-bg: #0f1115;      /* match bg */
+  --room-fill: #0f1115;      /* dark room fill */
+  --room-stroke: #2b3440;    /* dark outline */
+  --object-stroke: #2b3440;  /* object outline */
   --object-stroke-selected: #ffc800; /* highlight with yellow */
   --door: #58dda1;           /* mint doors */
   --door-selected: #ffc800;  /* selected door */
-  --label-text: #000000;     /* black labels */
-  --button-primary-bg: #ffc800; /* buttons use provided yellow */
+  --label-text: #e6e8eb;     /* light labels */
+  --button-primary-bg: #ffc800; /* yellow buttons */
   --button-primary-contrast: #000000; /* black text on yellow */
 }
 
@@ -123,6 +123,18 @@ body {
   backdrop-filter: blur(8px);
   height: 96px;
   box-shadow: var(--shadow-1);
+}
+
+/* Dark top bar + white brand for default (dark) theme */
+body[data-theme="default"] .topbar {
+  background: var(--panel);
+  border-bottom-color: var(--border);
+}
+body[data-theme="default"] .brand-logo {
+  background: #ffffff;
+}
+body[data-theme="default"] .brand-name {
+  color: #ffffff;
 }
 
 /* Themed brand (logo + name) */
