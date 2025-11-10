@@ -11,6 +11,10 @@ if (!defined('ABSPATH')) exit;
 define('SIMSPACE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SIMSPACE_PLUGIN_URL', plugins_url('/', __FILE__));
 
+// Track whether we had to use a fallback (no manifest found)
+global $simspace_used_fallback;
+$simspace_used_fallback = false;
+
 /**
  * Locate the Vite entry in manifest.json robustly.
  */
@@ -34,17 +38,58 @@ function simspace_manifest_entry($manifest) {
 }
 
 /**
+ * Fallback: if manifest is missing, attempt to enqueue first matching assets.
+ */
+function simspace_enqueue_fallback_assets($assets_dir, $assets_url) {
+  global $simspace_used_fallback;
+  $simspace_used_fallback = true;
+  $css_files = array_merge(
+    glob($assets_dir . '*.css') ?: [],
+    glob($assets_dir . 'assets/*.css') ?: []
+  );
+  foreach ($css_files as $file) {
+    $rel = str_replace($assets_dir, '', $file);
+    wp_enqueue_style('simspace-' . md5($rel), $assets_url . $rel, [], null);
+  }
+  $js_files = array_merge(
+    glob($assets_dir . '*.js') ?: [],
+    glob($assets_dir . 'assets/*.js') ?: []
+  );
+  $entry_js = '';
+  foreach ($js_files as $f) {
+    if (preg_match('~(^|/)index-.*\\.js$~', $f)) { $entry_js = $f; break; }
+  }
+  if (!$entry_js && !empty($js_files)) {
+    $entry_js = $js_files[0];
+  }
+  if ($entry_js) {
+    $rel = str_replace($assets_dir, '', $entry_js);
+    wp_enqueue_script('simspace-app', $assets_url . $rel, [], null, true);
+    if (function_exists('wp_script_add_data')) {
+      wp_script_add_data('simspace-app', 'type', 'module');
+    }
+  }
+}
+
+/**
  * Enqueue built assets (Vite manifest-based).
  */
 function simspace_enqueue_assets() {
   $assets_dir = SIMSPACE_PLUGIN_DIR . 'assets/';
   $assets_url = SIMSPACE_PLUGIN_URL . 'assets/';
   $manifest_path = $assets_dir . 'manifest.json';
-  if (!file_exists($manifest_path)) return;
+  if (!file_exists($manifest_path)) {
+    // Try fallback scan
+    simspace_enqueue_fallback_assets($assets_dir, $assets_url);
+    return;
+  }
 
   $manifest = json_decode(file_get_contents($manifest_path), true);
   $entry = simspace_manifest_entry($manifest);
-  if (!$entry) return;
+  if (!$entry) {
+    simspace_enqueue_fallback_assets($assets_dir, $assets_url);
+    return;
+  }
 
   // Optional: enqueue Google Fonts used by the app
   wp_enqueue_style(
@@ -96,6 +141,7 @@ function simspace_shortcode($atts = []) {
   // Optional diagnostics when debug is enabled
   $debugHtml = '';
   if ($debug) {
+    global $simspace_used_fallback;
     $assets_dir = SIMSPACE_PLUGIN_DIR . 'assets/';
     $assets_url = SIMSPACE_PLUGIN_URL . 'assets/';
     $manifest_path = $assets_dir . 'manifest.json';
@@ -115,6 +161,7 @@ function simspace_shortcode($atts = []) {
       . 'Manifest: <code>' . esc_html($manifest_status) . '</code>'
       . ($entry_file ? ' · Entry: <code>' . esc_html($entry_file) . '</code>' : '')
       . ' · CSS files: <code>' . esc_html((string)$css_count) . '</code>'
+      . ' · Fallback: <code>' . ($simspace_used_fallback ? 'yes' : 'no') . '</code>'
       . '<br>Assets URL: <code>' . esc_url($assets_url) . '</code>'
       . '</div>'
       . '<pre id="simspace-debug-log" style="margin:8px 0;padding:8px 10px;border:1px dashed #bbb;border-radius:6px;background:#fff;color:#111;max-height:240px;overflow:auto;font:12px/1.5 Menlo,Consolas,monospace;"></pre>'
