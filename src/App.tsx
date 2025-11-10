@@ -129,9 +129,6 @@ export default function App(): React.ReactElement {
     const saved = loadState();
     if (saved) {
       dispatch({ type: 'LOAD', state: saved });
-    } else {
-      // ensure simulator object exists on first load
-      dispatch({ type: 'SET_SIMULATOR', widthCm: DEFAULT_STATE.simulator.widthCm, depthCm: DEFAULT_STATE.simulator.depthCm });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
