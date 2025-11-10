@@ -84,6 +84,10 @@ function simspace_shortcode($atts = []) {
 
   $debug = $atts['debug'] === '1' || strtolower($atts['debug']) === 'true';
 
+  // Ensure assets are enqueued even when content builders (e.g., Bricks) render
+  // the shortcode in contexts where has_shortcode() on post_content won't catch it.
+  simspace_enqueue_assets();
+
   // Minimal visible confirmation that the shortcode rendered
   $debugHtml = $debug ? '<div class="simspace-debug-banner" style="margin:12px 0;padding:10px 12px;border:1px solid #ddd;border-radius:6px;background:#f7f7f7;color:#222;font:14px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">SimSpace shortcode active — assets will load if the build is present in the plugin’s assets folder.</div>' : '';
 
