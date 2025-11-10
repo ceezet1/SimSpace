@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/components/controls.tsx","./src/components/roomcanvas.tsx","./src/utils/geometry.ts","./src/utils/monitors.ts","./src/utils/persistence.ts","./src/utils/theme.ts"],"version":"5.9.3"}

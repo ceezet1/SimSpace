@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:wp": "WP_BUILD=1 tsc -b && vite build",
+    "build:wp": "WP_BUILD=1 tsc -b && WP_BUILD=1 vite build",
     "preview": "vite preview"
   },
   "dependencies": {
