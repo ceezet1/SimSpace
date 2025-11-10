@@ -14,6 +14,10 @@ define('SIMSPACE_PLUGIN_URL', plugins_url('/', __FILE__));
 // Track whether we had to use a fallback (no manifest found)
 global $simspace_used_fallback;
 $simspace_used_fallback = false;
+global $simspace_fallback_entry;
+$simspace_fallback_entry = '';
+global $simspace_fallback_css_count;
+$simspace_fallback_css_count = 0;
 
 /**
  * Locate the Vite entry in manifest.json robustly.
@@ -42,11 +46,14 @@ function simspace_manifest_entry($manifest) {
  */
 function simspace_enqueue_fallback_assets($assets_dir, $assets_url) {
   global $simspace_used_fallback;
+  global $simspace_fallback_entry;
+  global $simspace_fallback_css_count;
   $simspace_used_fallback = true;
   $css_files = array_merge(
     glob($assets_dir . '*.css') ?: [],
     glob($assets_dir . 'assets/*.css') ?: []
   );
+  $simspace_fallback_css_count = is_array($css_files) ? count($css_files) : 0;
   foreach ($css_files as $file) {
     $rel = str_replace($assets_dir, '', $file);
     wp_enqueue_style('simspace-' . md5($rel), $assets_url . $rel, [], null);
@@ -64,6 +71,7 @@ function simspace_enqueue_fallback_assets($assets_dir, $assets_url) {
   }
   if ($entry_js) {
     $rel = str_replace($assets_dir, '', $entry_js);
+    $simspace_fallback_entry = $rel;
     wp_enqueue_script('simspace-app', $assets_url . $rel, [], null, true);
     if (function_exists('wp_script_add_data')) {
       wp_script_add_data('simspace-app', 'type', 'module');
@@ -142,6 +150,8 @@ function simspace_shortcode($atts = []) {
   $debugHtml = '';
   if ($debug) {
     global $simspace_used_fallback;
+    global $simspace_fallback_entry;
+    global $simspace_fallback_css_count;
     $assets_dir = SIMSPACE_PLUGIN_DIR . 'assets/';
     $assets_url = SIMSPACE_PLUGIN_URL . 'assets/';
     $manifest_path = $assets_dir . 'manifest.json';
@@ -162,6 +172,8 @@ function simspace_shortcode($atts = []) {
       . ($entry_file ? ' · Entry: <code>' . esc_html($entry_file) . '</code>' : '')
       . ' · CSS files: <code>' . esc_html((string)$css_count) . '</code>'
       . ' · Fallback: <code>' . ($simspace_used_fallback ? 'yes' : 'no') . '</code>'
+      . ($simspace_used_fallback && $simspace_fallback_entry ? ' · Fallback entry: <code>' . esc_html($simspace_fallback_entry) . '</code>' : '')
+      . ($simspace_used_fallback ? ' · Fallback CSS count: <code>' . esc_html((string)$simspace_fallback_css_count) . '</code>' : '')
       . '<br>Assets URL: <code>' . esc_url($assets_url) . '</code>'
       . '</div>'
       . '<pre id="simspace-debug-log" style="margin:8px 0;padding:8px 10px;border:1px dashed #bbb;border-radius:6px;background:#fff;color:#111;max-height:240px;overflow:auto;font:12px/1.5 Menlo,Consolas,monospace;"></pre>'
