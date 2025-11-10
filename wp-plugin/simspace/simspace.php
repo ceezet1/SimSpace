@@ -86,14 +86,53 @@ function simspace_shortcode($atts = []) {
     'debug' => '0',
   ], $atts, 'simspace');
 
-  $debug = $atts['debug'] === '1' || strtolower($atts['debug']) === 'true';
+  $debugParam = isset($_GET['simspace_debug']) ? sanitize_text_field($_GET['simspace_debug']) : '0';
+  $debug = $atts['debug'] === '1' || strtolower($atts['debug']) === 'true' || $debugParam === '1';
 
   // Ensure assets are enqueued even when content builders (e.g., Bricks) render
   // the shortcode in contexts where has_shortcode() on post_content won't catch it.
   simspace_enqueue_assets();
 
-  // Minimal visible confirmation that the shortcode rendered
-  $debugHtml = $debug ? '<div class="simspace-debug-banner" style="margin:12px 0;padding:10px 12px;border:1px solid #ddd;border-radius:6px;background:#f7f7f7;color:#222;font:14px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">SimSpace shortcode active — assets will load if the build is present in the plugin’s assets folder.</div>' : '';
+  // Optional diagnostics when debug is enabled
+  $debugHtml = '';
+  if ($debug) {
+    $assets_dir = SIMSPACE_PLUGIN_DIR . 'assets/';
+    $assets_url = SIMSPACE_PLUGIN_URL . 'assets/';
+    $manifest_path = $assets_dir . 'manifest.json';
+    $manifest_status = file_exists($manifest_path) ? 'found' : 'missing';
+    $entry_file = '';
+    $css_count = 0;
+    if ($manifest_status === 'found') {
+      $manifest = json_decode(@file_get_contents($manifest_path), true);
+      $entry = simspace_manifest_entry($manifest);
+      if (is_array($entry)) {
+        $entry_file = isset($entry['file']) ? $entry['file'] : '';
+        $css_count = isset($entry['css']) && is_array($entry['css']) ? count($entry['css']) : 0;
+      }
+    }
+    $debugHtml .= '<div class="simspace-debug-banner" style="margin:12px 0;padding:10px 12px;border:1px solid #ddd;border-radius:6px;background:#f7f7f7;color:#222;font:14px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">'
+      . '<strong>SimSpace shortcode active</strong><br>'
+      . 'Manifest: <code>' . esc_html($manifest_status) . '</code>'
+      . ($entry_file ? ' · Entry: <code>' . esc_html($entry_file) . '</code>' : '')
+      . ' · CSS files: <code>' . esc_html((string)$css_count) . '</code>'
+      . '<br>Assets URL: <code>' . esc_url($assets_url) . '</code>'
+      . '</div>'
+      . '<pre id="simspace-debug-log" style="margin:8px 0;padding:8px 10px;border:1px dashed #bbb;border-radius:6px;background:#fff;color:#111;max-height:240px;overflow:auto;font:12px/1.5 Menlo,Consolas,monospace;"></pre>'
+      . '<script>(function(){'
+      . 'var logEl=document.getElementById("simspace-debug-log");'
+      . 'function w(msg){if(!logEl)return;var t=new Date().toISOString().slice(11,19);logEl.textContent+="["+t+"] "+msg+"\\n";}'
+      . 'w("Debug mode ON");'
+      . 'w("WP version: ' . esc_js(get_bloginfo('version')) . '");'
+      . 'w("Site URL: ' . esc_js(get_site_url()) . '");'
+      . 'w("Assets base: ' . esc_js($assets_url) . '");'
+      . 'window.addEventListener("error",function(e){w("Error: "+(e.message||"unknown")+" at "+(e.filename||"?")+":"+e.lineno+":"+e.colno);if(e.error&&e.error.stack)w(e.error.stack);});'
+      . 'window.addEventListener("unhandledrejection",function(e){var r=e.reason||{};w("UnhandledRejection: "+(r.message||String(r)));if(r.stack)w(r.stack);});'
+      . 'document.addEventListener("DOMContentLoaded",function(){'
+      . 'var root=document.getElementById("root"); w(root?"#root present":"#root MISSING");'
+      . 'if(window.SIMSPACE_BOOT){w("SIMSPACE_BOOT present: "+JSON.stringify(window.SIMSPACE_BOOT));} else {w("SIMSPACE_BOOT missing (ok if not used)");}'
+      . '});'
+      . '})();</script>';
+  }
 
   // The app expects a div#root (per index.html)
   return '<div class="simspace-container">'.$debugHtml.'<div id="root"></div></div>';
