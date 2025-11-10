@@ -77,9 +77,18 @@ function simspace_enqueue_assets() {
  * Shortcode renderer.
  * Usage: [simspace]
  */
-function simspace_shortcode() {
+function simspace_shortcode($atts = []) {
+  $atts = shortcode_atts([
+    'debug' => '0',
+  ], $atts, 'simspace');
+
+  $debug = $atts['debug'] === '1' || strtolower($atts['debug']) === 'true';
+
+  // Minimal visible confirmation that the shortcode rendered
+  $debugHtml = $debug ? '<div class="simspace-debug-banner" style="margin:12px 0;padding:10px 12px;border:1px solid #ddd;border-radius:6px;background:#f7f7f7;color:#222;font:14px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">SimSpace shortcode active — assets will load if the build is present in the plugin’s assets folder.</div>' : '';
+
   // The app expects a div#root (per index.html)
-  return '<div id="root"></div>';
+  return '<div class="simspace-container">'.$debugHtml.'<div id="root"></div></div>';
 }
 add_shortcode('simspace', 'simspace_shortcode');
 

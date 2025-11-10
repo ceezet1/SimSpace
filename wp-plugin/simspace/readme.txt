@@ -14,6 +14,10 @@ Add the SimSpace planner to any page using the shortcode:
 
 [simspace]
 
+Enable a visible debug banner to confirm the shortcode is rendering:
+
+[simspace debug="1"]
+
 == Installation ==
 
 1. Upload the plugin ZIP via wp-admin → Plugins → Add New → Upload Plugin.
