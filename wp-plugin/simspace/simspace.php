@@ -65,6 +65,10 @@ function simspace_enqueue_assets() {
   // JS entry
   if (!empty($entry['file'])) {
     wp_enqueue_script('simspace-app', $assets_url . $entry['file'], [], null, true);
+    // Vite build outputs ESM; ensure <script type="module">
+    if (function_exists('wp_script_add_data')) {
+      wp_script_add_data('simspace-app', 'type', 'module');
+    }
     // Example of passing data to the app if needed later
     wp_localize_script('simspace-app', 'SIMSPACE_BOOT', [
       'restBase' => esc_url_raw(rest_url('simspace/v1/')),
