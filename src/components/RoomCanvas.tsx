@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ProjectState, PlacedObject, Door } from '../types';
 import { clamp, snapToGridCm } from '../utils/geometry';
+import { ProShape } from './ProShape';
 
 interface CanvasProps {
   state: ProjectState;
@@ -22,6 +23,184 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
   function toDisplayUnitsVal(cm: number): number {
     return state.units === 'metric' ? cm : cm / 2.54;
   }
+
+  // Fits an arbitrary SVG path into a target rectangle (in pixels) by measuring its bbox at runtime.
+  const FittedPath: React.FC<{
+    d: string;
+    targetWidthPx: number;
+    targetHeightPx: number;
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    opacity?: number;
+    pathTransform?: string;
+    fitMode?: 'contain' | 'width' | 'height' | 'stretch';
+    debugBoxMode?: 'none' | 'target' | 'shape' | 'both';
+  }> = ({ d, targetWidthPx, targetHeightPx, fill, stroke, strokeWidth = 1, opacity = 1, pathTransform, fitMode = 'contain', debugBoxMode = 'none' }) => {
+    const nodeRef = useRef<SVGGElement | SVGPathElement | null>(null);
+    const [bbox, setBbox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+    useLayoutEffect(() => {
+      if (nodeRef.current) {
+        const b = (nodeRef.current as any).getBBox?.();
+        if (b && isFinite(b.width) && isFinite(b.height) && b.width > 0 && b.height > 0) {
+          setBbox({ x: b.x, y: b.y, width: b.width, height: b.height });
+        }
+      }
+    }, [d]);
+    if (!bbox) {
+      // Render once invisibly to measure
+      return pathTransform ? (
+        <g ref={nodeRef as any} transform={pathTransform}>
+          <path d={d} fill="none" stroke="transparent" />
+        </g>
+      ) : (
+        <path ref={nodeRef as any} d={d} fill="none" stroke="transparent" />
+      );
+    }
+    const baseScaleX = targetWidthPx / bbox.width;
+    const baseScaleY = targetHeightPx / bbox.height;
+    let useScaleX = baseScaleX;
+    let useScaleY = baseScaleY;
+    if (fitMode === 'contain') {
+      const uni = Math.min(baseScaleX, baseScaleY);
+      useScaleX = uni;
+      useScaleY = uni;
+    } else if (fitMode === 'width') {
+      useScaleX = baseScaleX;
+      useScaleY = baseScaleX;
+    } else if (fitMode === 'height') {
+      useScaleX = baseScaleY;
+      useScaleY = baseScaleY;
+    } // 'stretch' uses baseScaleX/baseScaleY as-is
+    const tx = -bbox.x;
+    const ty = -bbox.y;
+    const offsetX = (targetWidthPx - bbox.width * useScaleX) / 2;
+    const offsetY = (targetHeightPx - bbox.height * useScaleY) / 2;
+    const transform = `translate(${offsetX}, ${offsetY}) scale(${useScaleX}, ${useScaleY}) translate(${tx}, ${ty})`;
+    return (
+      <>
+        {(debugBoxMode === 'target' || debugBoxMode === 'both') && (
+          <rect
+            x={0}
+            y={0}
+            width={targetWidthPx}
+            height={targetHeightPx}
+            fill="none"
+            stroke="var(--muted)"
+            strokeDasharray="6 4"
+            strokeWidth={1}
+            opacity={0.8}
+          />
+        )}
+        {(debugBoxMode === 'shape' || debugBoxMode === 'both') && (
+          <rect
+            x={offsetX}
+            y={offsetY}
+            width={bbox.width * useScaleX}
+            height={bbox.height * useScaleY}
+            fill="none"
+            stroke="var(--muted)"
+            strokeDasharray="6 4"
+            strokeWidth={1}
+            opacity={0.8}
+          />
+        )}
+      <g transform={transform}>
+        {pathTransform ? (
+          <g transform={pathTransform}>
+            <path d={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth / Math.max(useScaleX, useScaleY)} opacity={opacity} />
+          </g>
+        ) : (
+          <path d={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth / Math.max(useScaleX, useScaleY)} opacity={opacity} />
+        )}
+      </g>
+      </>
+    );
+  };
+
+  const FittedPolygon: React.FC<{
+    pointsCm: Array<{ x: number; y: number }>;
+    targetWidthPx: number;
+    targetHeightPx: number;
+    fill: string;
+    stroke: string;
+    strokeWidth?: number;
+    opacity?: number;
+    rotateDeg?: number;
+  }> = ({ pointsCm, targetWidthPx, targetHeightPx, fill, stroke, strokeWidth = 1, opacity = 1, rotateDeg = 0 }) => {
+    if (!pointsCm.length) return null;
+    // Compute bbox in cm
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pointsCm) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const widthCm = Math.max(1e-6, maxX - minX);
+    const heightCm = Math.max(1e-6, maxY - minY);
+    // Scale to target px
+    const sx = targetWidthPx / (widthCm * pxPerCm);
+    const sy = targetHeightPx / (heightCm * pxPerCm);
+    const s = Math.min(sx, sy);
+    // Convert cm -> px with center alignment
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const rad = (rotateDeg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const pts = pointsCm.map((p) => {
+      // rotate about center before scaling
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const rx = dx * cos - dy * sin;
+      const ry = dx * sin + dy * cos;
+      const xpx = rx * pxPerCm * s + targetWidthPx / 2;
+      const ypx = ry * pxPerCm * s + targetHeightPx / 2;
+      return `${xpx},${ypx}`;
+    }).join(' ');
+    // Use nonzero to avoid diagonal cuts from self-crossing outlines
+    return <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} fillRule="nonzero" />;
+  };
+
+  const FittedPolyline: React.FC<{
+    pointsCm: Array<{ x: number; y: number }>;
+    targetWidthPx: number;
+    targetHeightPx: number;
+    stroke: string;
+    strokeWidth?: number;
+    opacity?: number;
+    rotateDeg?: number;
+  }> = ({ pointsCm, targetWidthPx, targetHeightPx, stroke, strokeWidth = 2, opacity = 1, rotateDeg = 0 }) => {
+    if (!pointsCm.length) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pointsCm) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const widthCm = Math.max(1e-6, maxX - minX);
+    const heightCm = Math.max(1e-6, maxY - minY);
+    const sx = targetWidthPx / (widthCm * pxPerCm);
+    const sy = targetHeightPx / (heightCm * pxPerCm);
+    const s = Math.min(sx, sy);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const rad = (rotateDeg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const pts = pointsCm.map((p) => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const rx = dx * cos - dy * sin;
+      const ry = dx * sin + dy * cos;
+      const xpx = rx * pxPerCm * s + targetWidthPx / 2;
+      const ypx = ry * pxPerCm * s + targetHeightPx / 2;
+      return `${xpx},${ypx}`;
+    }).join(' ');
+    return <polyline points={pts} fill="none" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />;
+  };
 
   const widthPx = useMemo(() => svgRef.current?.clientWidth ?? 0, []);
   const heightPx = useMemo(() => svgRef.current?.clientHeight ?? 0, []);
@@ -178,10 +357,25 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
       return yiq >= 186 ? '#000000' : '#ffffff';
     }
     const textOnObj = getContrastText(o.color);
+    const nameTrim = o.name.trim();
+    const isProExact = /^pro$/i.test(nameTrim);
     return (
       <g key={o.id} data-object role="button" tabIndex={0} onPointerDown={(e) => startDragObject(o, e)} onPointerMove={onDragMove} onPointerUp={endDrag} onDoubleClick={() => dispatch({ type: 'SELECT_OBJECT', id: o.id })}>
         <g transform={transform} filter={isSel ? 'url(#objShadow)' : undefined}>
-          <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'} strokeWidth={isSel ? 2.5 : 1.25} />
+          {/* If PRO simulator and we have an outline polygon, fit it into the object's width/depth. Otherwise draw rect. */}
+          {o.kind === 'simulator' && isProExact ? (
+            <ProShape
+              widthPx={w}
+              heightPx={d}
+              fill={o.color}
+              stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'}
+              strokeWidth={1.25}
+              opacity={0.95}
+              showDebug
+            />
+          ) : (
+            <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'} strokeWidth={isSel ? 2.5 : 1.25} />
+          )}
           <text x={10} y={20} fontSize={12} fill={textOnObj} style={{ userSelect: 'none', fontWeight: 600 }}>{o.name}</text>
           {state.showDimensions && (
             <text x={10} y={34} fontSize={11} fill={textOnObj} style={{ userSelect: 'none' }}>
@@ -197,9 +391,7 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
             // Special placements:
             //  - PRO AM: monitors sit on top with ~20cm of simulator protruding
             //  - PRO (exact): monitors sit on top with ~30cm buffer
-            const nameTrim = o.name.trim();
             const isProAm = /pro\s*am/i.test(nameTrim);
-            const isProExact = /^pro$/i.test(nameTrim);
             const startY = isProAm
               ? 20 * pxPerCm
               : isProExact

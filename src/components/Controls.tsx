@@ -213,7 +213,7 @@ export const Controls: React.FC<ControlsProps> = ({ state, dispatch }) => {
         <h3>Add Simulators</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
           <button onClick={() => addTemplate('PRO AM', 80, 190, currentPalette[5] || '#9EABA2')}>Add <strong>PRO AM</strong> (80×190cm)</button>
-          <button onClick={() => addTemplate('PRO', 100, 240, currentPalette[0] || '#A36361')}>Add <strong>PRO</strong> (100×240cm)</button>
+          <button onClick={() => addTemplate('PRO', 99.5, 176, currentPalette[0] || '#A36361')}>Add <strong>PRO</strong> (99.5×176cm)</button>
         </div>
       </div>
 
