@@ -9,7 +9,8 @@ import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ProjectState, PlacedObject, Door } from '../types';
 import { clamp, snapToGridCm } from '../utils/geometry';
 import { ProShape } from './ProShape';
-import { PRO_N_MONITOR_EDGE_RATIOS } from '../assets/proSvgPath';
+import { ProAmShape } from './ProAmShape';
+import { PRO_N_MONITOR_EDGE_RATIOS, PRO_AM_MONITOR_EDGE_RATIOS } from '../assets/proSvgPath';
 
 interface CanvasProps {
   state: ProjectState;
@@ -367,31 +368,53 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
     const textOnObj = getContrastText(o.color);
     const nameTrim = o.name.trim();
     const isProExact = /^pro$/i.test(nameTrim);
-    const proEdgeLeft = PRO_N_MONITOR_EDGE_RATIOS.left * w;
-    const proEdgeRight = PRO_N_MONITOR_EDGE_RATIOS.right * w;
+    const isProAmExact = /^pro\s*am$/i.test(nameTrim);
+    const isProAmName = /pro\s*am/i.test(nameTrim);
+    const specialEdgeRatios = isProExact
+      ? PRO_N_MONITOR_EDGE_RATIOS
+      : isProAmExact
+        ? PRO_AM_MONITOR_EDGE_RATIOS
+        : null;
+    const monitorEdgeLeftPx = specialEdgeRatios ? specialEdgeRatios.left * w : null;
+    const monitorEdgeRightPx = specialEdgeRatios ? specialEdgeRatios.right * w : null;
     const dimLabel = `${Math.round(toDisplayUnitsVal(o.widthCm))}x${Math.round(toDisplayUnitsVal(o.depthCm))} ${unitsLabel}`;
     const textX = w / 2;
     return (
       <g key={o.id} data-object role="button" tabIndex={0} onPointerDown={(e) => startDragObject(o, e)} onPointerMove={onDragMove} onPointerUp={endDrag} onDoubleClick={() => dispatch({ type: 'SELECT_OBJECT', id: o.id })}>
         <g transform={transform} filter={isSel ? 'url(#objShadow)' : undefined}>
-          {/* If PRO simulator and we have an outline polygon, fit it into the object's width/depth. Otherwise draw rect. */}
-          {o.kind === 'simulator' && isProExact ? (
-            <ProShape
-              widthPx={w}
-              heightPx={d}
-              fill={o.color}
-              stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'}
-              strokeWidth={1.25}
-              opacity={0.95}
-            />
-          ) : (
-            <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'} strokeWidth={isSel ? 2.5 : 1.25} />
-          )}
-          <text x={textX} y={Math.min(d - 10, 20)} fontSize={12} fill={textOnObj} textAnchor="middle" style={{ userSelect: 'none', fontWeight: 600, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))' }}>
+          {/* If simulator matches special outline, render SVG shape; otherwise draw rect. */}
+          {(() => {
+            if (o.kind === 'simulator' && isProExact) {
+              return (
+                <ProShape
+                  widthPx={w}
+                  heightPx={d}
+                  fill={o.color}
+                  stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'}
+                  strokeWidth={1.25}
+                  opacity={0.95}
+                />
+              );
+            }
+            if (o.kind === 'simulator' && isProAmExact) {
+              return (
+                <ProAmShape
+                  widthPx={w}
+                  heightPx={d}
+                  fill={o.color}
+                  stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'}
+                  strokeWidth={1.25}
+                  opacity={0.95}
+                />
+              );
+            }
+            return <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'} strokeWidth={isSel ? 2.5 : 1.25} />;
+          })()}
+          <text x={textX} y={d / 2 - 4} fontSize={14} fill={textOnObj} textAnchor="middle" dominantBaseline="middle" style={{ userSelect: 'none', fontWeight: 600, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}>
             {o.name}
           </text>
           {state.showDimensions && (
-            <text x={textX} y={Math.min(d - 10, 40)} fontSize={11} fill={textOnObj} textAnchor="middle" style={{ userSelect: 'none', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+            <text x={textX} y={d / 2 + 16} fontSize={12} fill={textOnObj} textAnchor="middle" dominantBaseline="middle" style={{ userSelect: 'none', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' }}>
               {dimLabel}
             </text>
           )}
@@ -407,8 +430,23 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
             // Special placements:
             //  - PRO AM: monitors sit on top with ~20cm of simulator protruding
             //  - PRO (exact): monitors sit on top with ~30cm buffer
-            const isProAm = /pro\s*am/i.test(nameTrim);
-            const chassisOffsetCm = isProExact ? -14 : isProAm ? -30 : - (standDepthPx / pxPerCm) - (barThicknessPx / pxPerCm) - 6;
+            let chassisOffsetCm: number;
+            if (isProExact) {
+              chassisOffsetCm = -14;
+            } else if (isProAmName) {
+              const preset = o.monitor?.presetKey;
+              let desiredSpecOffset: number;
+              if (preset === 'single-49' || preset === 'triple-42' || preset === 'triple-45c') {
+                desiredSpecOffset = -20;
+              } else if (preset === 'triple-55' || preset === 'triple-65') {
+                desiredSpecOffset = 14;
+              } else {
+                desiredSpecOffset = 30;
+              }
+              chassisOffsetCm = -desiredSpecOffset;
+            } else {
+              chassisOffsetCm = - (standDepthPx / pxPerCm) - (barThicknessPx / pxPerCm) - 6;
+            }
             const desiredYOffsetPx = chassisOffsetCm * pxPerCm;
             const monitorFill = o.color;
             const monitorStroke = isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)';
@@ -494,14 +532,14 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
                 <g>
                   <rect x={bulkX} y={bulkY} width={bulkWidthPx} height={bulkThicknessPx} fill={monitorStroke} opacity={0.45} rx={Math.max(1, 0.5 * pxPerCm)} />
                   {renderStandBar(startX, mw, measurementY, 0, 0, 'center')}
-                  {state.showDimensions && isProExact && (
+                  {state.showDimensions && monitorEdgeLeftPx != null && monitorEdgeRightPx != null && (
                     <>
-                      <line x1={proEdgeLeft} y1={0} x2={proEdgeLeft} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
-                      <line x1={proEdgeRight} y1={0} x2={proEdgeRight} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
-                      <text x={proEdgeLeft + 6} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
+                      <line x1={monitorEdgeLeftPx} y1={0} x2={monitorEdgeLeftPx} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
+                      <line x1={monitorEdgeRightPx} y1={0} x2={monitorEdgeRightPx} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
+                      <text x={monitorEdgeLeftPx + 6} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
                         {`${Math.abs(chassisOffsetCm)} cm`}
                       </text>
-                      <text x={proEdgeRight - 54} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
+                      <text x={monitorEdgeRightPx - 54} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
                         {`${Math.abs(chassisOffsetCm)} cm`}
                       </text>
                     </>
@@ -552,14 +590,14 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
             );
             return (
               <g>
-                {state.showDimensions && isProExact && (
+                {state.showDimensions && monitorEdgeLeftPx != null && monitorEdgeRightPx != null && (
                   <>
-                    <line x1={proEdgeLeft} y1={0} x2={proEdgeLeft} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
-                    <line x1={proEdgeRight} y1={0} x2={proEdgeRight} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
-                    <text x={proEdgeLeft + 6} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
+                    <line x1={monitorEdgeLeftPx} y1={0} x2={monitorEdgeLeftPx} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
+                    <line x1={monitorEdgeRightPx} y1={0} x2={monitorEdgeRightPx} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
+                    <text x={monitorEdgeLeftPx + 6} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
                       {`${Math.abs(chassisOffsetCm)} cm`}
                     </text>
-                    <text x={proEdgeRight - 54} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
+                    <text x={monitorEdgeRightPx - 54} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
                       {`${Math.abs(chassisOffsetCm)} cm`}
                     </text>
                   </>
