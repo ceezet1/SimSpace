@@ -1,7 +1,15 @@
+function describeMonitorArc(x: number, y: number, chordLengthPx: number, radiusPx: number, concaveDown = false): string {
+  const halfChord = chordLengthPx / 2;
+  const limitedRadius = Math.max(radiusPx, halfChord + 1);
+  const endX = x + chordLengthPx;
+  const sweepFlag = concaveDown ? 1 : 0;
+  return `M ${x} ${y} A ${limitedRadius} ${limitedRadius} 0 0 ${sweepFlag} ${endX} ${y}`;
+}
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ProjectState, PlacedObject, Door } from '../types';
 import { clamp, snapToGridCm } from '../utils/geometry';
 import { ProShape } from './ProShape';
+import { PRO_N_MONITOR_EDGE_RATIOS } from '../assets/proSvgPath';
 
 interface CanvasProps {
   state: ProjectState;
@@ -359,6 +367,10 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
     const textOnObj = getContrastText(o.color);
     const nameTrim = o.name.trim();
     const isProExact = /^pro$/i.test(nameTrim);
+    const proEdgeLeft = PRO_N_MONITOR_EDGE_RATIOS.left * w;
+    const proEdgeRight = PRO_N_MONITOR_EDGE_RATIOS.right * w;
+    const dimLabel = `${Math.round(toDisplayUnitsVal(o.widthCm))}x${Math.round(toDisplayUnitsVal(o.depthCm))} ${unitsLabel}`;
+    const textX = w / 2;
     return (
       <g key={o.id} data-object role="button" tabIndex={0} onPointerDown={(e) => startDragObject(o, e)} onPointerMove={onDragMove} onPointerUp={endDrag} onDoubleClick={() => dispatch({ type: 'SELECT_OBJECT', id: o.id })}>
         <g transform={transform} filter={isSel ? 'url(#objShadow)' : undefined}>
@@ -371,38 +383,66 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
               stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'}
               strokeWidth={1.25}
               opacity={0.95}
-              showDebug
             />
           ) : (
             <rect width={w} height={d} rx={12} ry={12} fill={o.color} opacity={o.kind === 'simulator' ? 0.95 : 0.9} stroke={isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)'} strokeWidth={isSel ? 2.5 : 1.25} />
           )}
-          <text x={10} y={20} fontSize={12} fill={textOnObj} style={{ userSelect: 'none', fontWeight: 600 }}>{o.name}</text>
+          <text x={textX} y={Math.min(d - 10, 20)} fontSize={12} fill={textOnObj} textAnchor="middle" style={{ userSelect: 'none', fontWeight: 600, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))' }}>
+            {o.name}
+          </text>
           {state.showDimensions && (
-            <text x={10} y={34} fontSize={11} fill={textOnObj} style={{ userSelect: 'none' }}>
-              {`${Math.round(toDisplayUnitsVal(o.widthCm))}x${Math.round(toDisplayUnitsVal(o.depthCm))} ${unitsLabel}`}
+            <text x={textX} y={Math.min(d - 10, 40)} fontSize={11} fill={textOnObj} textAnchor="middle" style={{ userSelect: 'none', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+              {dimLabel}
             </text>
           )}
           {/* Monitor attachment (renders in object-local coords so it rotates with the simulator) */}
           {o.kind === 'simulator' && o.monitor && o.monitor.layout !== 'none' && (() => {
+            const isCurved = !!o.monitor.curvatureRadiusCm;
+            const curvatureRadiusPx = isCurved ? o.monitor.curvatureRadiusCm! * pxPerCm : null;
             const mw = o.monitor.panelWidthCm * pxPerCm;
             const standDepthPx = o.monitor.panelDepthCm * pxPerCm;
-            const barThicknessPx = 8 * pxPerCm; // visual thickness of monitor in top-down view (~8cm)
+            const baseMonitorThicknessCm = 3;
+            const barThicknessPx = Math.max(2, baseMonitorThicknessCm * pxPerCm);
             const startX = (w - mw) / 2;
             // Special placements:
             //  - PRO AM: monitors sit on top with ~20cm of simulator protruding
             //  - PRO (exact): monitors sit on top with ~30cm buffer
             const isProAm = /pro\s*am/i.test(nameTrim);
-            const startY = isProAm
-              ? 20 * pxPerCm
-              : isProExact
-                ? 30 * pxPerCm
-                : (-standDepthPx - barThicknessPx - 6);
+            const chassisOffsetCm = isProExact ? -14 : isProAm ? -30 : - (standDepthPx / pxPerCm) - (barThicknessPx / pxPerCm) - 6;
+            const desiredYOffsetPx = chassisOffsetCm * pxPerCm;
             const monitorFill = o.color;
             const monitorStroke = isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)';
+            const sagittaPx = (chord: number, radius: number) => radius - Math.sqrt(Math.max(0, radius ** 2 - (chord / 2) ** 2));
             if (o.monitor.layout === 'single') {
+              const singleSag = isCurved && curvatureRadiusPx ? sagittaPx(mw, curvatureRadiusPx) : 0;
+              const startY = desiredYOffsetPx + singleSag;
+              const measurementY = desiredYOffsetPx;
               return (
                 <g>
-                  <rect x={startX} y={startY} width={mw} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />
+                  {state.showDimensions && isProExact && (
+                    <>
+                      <line x1={proEdgeLeft} y1={0} x2={proEdgeLeft} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
+                      <line x1={proEdgeRight} y1={0} x2={proEdgeRight} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
+                      <text x={proEdgeLeft + 6} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
+                        {`${Math.abs(chassisOffsetCm)} cm`}
+                      </text>
+                      <text x={proEdgeRight - 54} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
+                        {`${Math.abs(chassisOffsetCm)} cm`}
+                      </text>
+                    </>
+                  )}
+                  {isCurved && curvatureRadiusPx ? (
+                    <path
+                      d={describeMonitorArc(startX, startY, mw, curvatureRadiusPx, true)}
+                      stroke={monitorStroke}
+                      strokeWidth={barThicknessPx}
+                      fill="none"
+                      strokeLinecap="round"
+                      opacity={0.95}
+                    />
+                  ) : (
+                    <rect x={startX} y={startY} width={mw} height={barThicknessPx} rx={Math.max(0.5, 0.8 * pxPerCm)} ry={Math.max(0.5, 0.8 * pxPerCm)} fill={monitorFill} opacity={0.95} stroke={monitorStroke} strokeWidth={0.8} />
+                  )}
                   {state.showDimensions && (
                     <g>
                       <line x1={startX} y1={startY - 6} x2={startX + mw} y2={startY - 6} stroke={'var(--muted)'} strokeWidth={1} />
@@ -415,26 +455,74 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
               );
             }
             // triple: draw 3 panels with gaps
-            const gapPx = (o.monitor.gapCm ?? 2) * pxPerCm;
+            const gapPx = isCurved ? 0 : (o.monitor.gapCm ?? 0) * pxPerCm;
             const panelW = (mw - 2 * gapPx) / 3;
-            const angle = o.monitor.angleDeg ?? 20;
+            const panelSag = isCurved && curvatureRadiusPx ? sagittaPx(panelW, curvatureRadiusPx) : 0;
+            const panelStartY = desiredYOffsetPx + panelSag;
+            const measurementY = desiredYOffsetPx;
+            const angle = o.monitor.angleDeg ?? (isCurved ? (o.monitor.screenInches === 45 ? 68 : 90) : 20);
             return (
               <g>
+                {state.showDimensions && isProExact && (
+                  <>
+                    <line x1={proEdgeLeft} y1={0} x2={proEdgeLeft} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
+                    <line x1={proEdgeRight} y1={0} x2={proEdgeRight} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
+                    <text x={proEdgeLeft + 6} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
+                      {`${Math.abs(chassisOffsetCm)} cm`}
+                    </text>
+                    <text x={proEdgeRight - 54} y={measurementY / 2} fontSize={10} fill="rgba(0,0,0,0.45)">
+                      {`${Math.abs(chassisOffsetCm)} cm`}
+                    </text>
+                  </>
+                )}
                 {/* Left panel rotated inward */}
-                <g transform={`rotate(${-angle}, ${startX + panelW}, ${startY + barThicknessPx / 2})`}>
-                  <rect x={startX} y={startY} width={panelW} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />
+                <g transform={`rotate(${-angle}, ${startX + panelW}, ${panelStartY + barThicknessPx / 2})`}>
+                  {isCurved && curvatureRadiusPx ? (
+                    <path
+                      d={describeMonitorArc(startX, panelStartY, panelW, curvatureRadiusPx, true)}
+                      stroke={monitorStroke}
+                      strokeWidth={barThicknessPx}
+                      fill="none"
+                      strokeLinecap="round"
+                      opacity={0.95}
+                    />
+                  ) : (
+                  <rect x={startX} y={panelStartY} width={panelW} height={barThicknessPx} rx={Math.max(0.5, 0.8 * pxPerCm)} ry={Math.max(0.5, 0.8 * pxPerCm)} fill={monitorFill} opacity={0.95} stroke={monitorStroke} strokeWidth={0.8} />
+                  )}
                 </g>
                 {/* Center panel */}
-                <rect x={startX + panelW + gapPx} y={startY} width={panelW} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.95} stroke={monitorStroke} strokeWidth={1} />
+                {isCurved && curvatureRadiusPx ? (
+                  <path
+                    d={describeMonitorArc(startX + panelW + gapPx, panelStartY, panelW, curvatureRadiusPx, true)}
+                    stroke={monitorStroke}
+                    strokeWidth={barThicknessPx}
+                    fill="none"
+                    strokeLinecap="round"
+                    opacity={0.98}
+                  />
+                ) : (
+                  <rect x={startX + panelW + gapPx} y={panelStartY} width={panelW} height={barThicknessPx} rx={Math.max(0.5, 0.8 * pxPerCm)} ry={Math.max(0.5, 0.8 * pxPerCm)} fill={monitorFill} opacity={0.98} stroke={monitorStroke} strokeWidth={0.8} />
+                )}
                 {/* Right panel rotated inward */}
-                <g transform={`rotate(${angle}, ${startX + 2 * (panelW + gapPx)}, ${startY + barThicknessPx / 2})`}>
-                  <rect x={startX + 2 * (panelW + gapPx)} y={startY} width={panelW} height={barThicknessPx} rx={6} ry={6} fill={monitorFill} opacity={0.9} stroke={monitorStroke} strokeWidth={1} />
+                <g transform={`rotate(${angle}, ${startX + 2 * (panelW + gapPx)}, ${panelStartY + barThicknessPx / 2})`}>
+                  {isCurved && curvatureRadiusPx ? (
+                    <path
+                      d={describeMonitorArc(startX + 2 * (panelW + gapPx), panelStartY, panelW, curvatureRadiusPx, true)}
+                      stroke={monitorStroke}
+                      strokeWidth={barThicknessPx}
+                      fill="none"
+                      strokeLinecap="round"
+                      opacity={0.95}
+                    />
+                  ) : (
+                  <rect x={startX + 2 * (panelW + gapPx)} y={panelStartY} width={panelW} height={barThicknessPx} rx={Math.max(0.5, 0.8 * pxPerCm)} ry={Math.max(0.5, 0.8 * pxPerCm)} fill={monitorFill} opacity={0.95} stroke={monitorStroke} strokeWidth={0.8} />
+                  )}
                 </g>
                 {state.showDimensions && (
                   <g>
                     {(() => {
                       // Compute rotated outer endpoints of side panels and measure between them
-                      const cy = startY + barThicknessPx / 2;
+                      const cy = panelStartY + barThicknessPx / 2;
                       // Left outer midpoint before rotation
                       const l0x = startX; const l0y = cy;
                       const lcx = startX + panelW; const lcy = cy; // left pivot (inner edge)
