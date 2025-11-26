@@ -605,7 +605,14 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
                 {/* Left panel rotated inward */}
                 <g transform={`rotate(${-angle}, ${startX + panelW}, ${panelStartY + barThicknessPx / 2})`}>
                   {renderBulk(startX)}
-                  {renderStandBar(startX + panelW * 0.35, panelW * 0.65, measurementY, 0, standBarOverlapPx * 0.65, 'left')}
+                  {renderStandBar(
+                    startX + panelW * 0.35,
+                    panelW * 0.65,
+                    measurementY,
+                    isCurved ? standBarOverlapPx * 0.65 : 0,
+                    standBarOverlapPx * 0.65 + (isCurved ? 15 * pxPerCm : 0),
+                    'left',
+                  )}
                   {isCurved && curvatureRadiusPx ? (
                     <path
                       d={describeMonitorArc(startX, panelStartY, panelW, curvatureRadiusPx, true)}
@@ -621,7 +628,14 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
                 </g>
                 {/* Center panel */}
                 {renderBulk(startX + panelW + gapPx)}
-                {renderStandBar(startX + panelW + gapPx, panelW, measurementY, standBarOverlapPx, standBarOverlapPx, 'center')}
+                {renderStandBar(
+                  startX + panelW + gapPx,
+                  panelW,
+                  measurementY,
+                  standBarOverlapPx + (isCurved ? 10 * pxPerCm : 0),
+                  standBarOverlapPx + (isCurved ? 10 * pxPerCm : 0),
+                  'center',
+                )}
                 {isCurved && curvatureRadiusPx ? (
                   <path
                     d={describeMonitorArc(startX + panelW + gapPx, panelStartY, panelW, curvatureRadiusPx, true)}
@@ -637,7 +651,14 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
                 {/* Right panel rotated inward */}
                 <g transform={`rotate(${angle}, ${startX + 2 * (panelW + gapPx)}, ${panelStartY + barThicknessPx / 2})`}>
                   {renderBulk(startX + 2 * (panelW + gapPx))}
-                  {renderStandBar(startX + 2 * (panelW + gapPx), panelW * 0.65, measurementY, standBarOverlapPx * 0.65, 0, 'right')}
+                  {renderStandBar(
+                    startX + 2 * (panelW + gapPx),
+                    panelW * 0.65,
+                    measurementY,
+                    standBarOverlapPx * 0.65 + (isCurved ? 15 * pxPerCm : 0),
+                    standBarOverlapPx * 0.65,
+                    'right',
+                  )}
                   {isCurved && curvatureRadiusPx ? (
                     <path
                       d={describeMonitorArc(startX + 2 * (panelW + gapPx), panelStartY, panelW, curvatureRadiusPx, true)}
