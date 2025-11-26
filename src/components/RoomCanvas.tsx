@@ -413,12 +413,87 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
             const monitorFill = o.color;
             const monitorStroke = isSel ? 'var(--object-stroke-selected)' : 'var(--object-stroke)';
             const sagittaPx = (chord: number, radius: number) => radius - Math.sqrt(Math.max(0, radius ** 2 - (chord / 2) ** 2));
+            const standBarThicknessPx = Math.max(2, 8 * pxPerCm);
+            const standBarOffsetPx = 8 * pxPerCm;
+            const standBarStrokeWidth = Math.max(0.8, 0.5 * pxPerCm);
+            const standBarOverlapPx = Math.max(standBarThicknessPx, 12 * pxPerCm);
+            const bulkWidthCm = 20;
+            const bulkThicknessCm = 8;
+            const renderStandBar = (x: number, width: number, baseY: number, extendLeft = 0, extendRight = 0, withBrackets: false | 'center' | 'left' | 'right' = false) => {
+              const px = x - extendLeft;
+              const barWidth = width + extendLeft + extendRight;
+              const barY = baseY - standBarThicknessPx - standBarOffsetPx;
+              return (
+                <>
+                  <rect
+                    x={px}
+                    y={barY}
+                    width={barWidth}
+                    height={standBarThicknessPx}
+                    fill={o.color}
+                    stroke={monitorStroke}
+                    strokeWidth={standBarStrokeWidth}
+                    opacity={0.9}
+                  />
+                  {withBrackets === 'center' && (
+                    <>
+                      <rect
+                        x={px + 16 * pxPerCm}
+                        y={barY - 8 * pxPerCm}
+                        width={8 * pxPerCm}
+                        height={8 * pxPerCm}
+                        fill={monitorStroke}
+                        opacity={0.45}
+                        rx={Math.max(1, 0.4 * pxPerCm)}
+                      />
+                      <rect
+                        x={px + barWidth - 16 * pxPerCm - 8 * pxPerCm}
+                        y={barY - 8 * pxPerCm}
+                        width={8 * pxPerCm}
+                        height={8 * pxPerCm}
+                        fill={monitorStroke}
+                        opacity={0.45}
+                        rx={Math.max(1, 0.4 * pxPerCm)}
+                      />
+                    </>
+                  )}
+                  {withBrackets === 'left' && (
+                    <rect
+                      x={px + 8 * pxPerCm}
+                      y={barY - 8 * pxPerCm}
+                      width={8 * pxPerCm}
+                      height={8 * pxPerCm}
+                      fill={monitorStroke}
+                      opacity={0.45}
+                      rx={Math.max(1, 0.4 * pxPerCm)}
+                    />
+                  )}
+                  {withBrackets === 'right' && (
+                    <rect
+                      x={px + barWidth - 8 * pxPerCm - 8 * pxPerCm}
+                      y={barY - 8 * pxPerCm}
+                      width={8 * pxPerCm}
+                      height={8 * pxPerCm}
+                      fill={monitorStroke}
+                      opacity={0.45}
+                      rx={Math.max(1, 0.4 * pxPerCm)}
+                    />
+                  )}
+                </>
+              );
+            };
             if (o.monitor.layout === 'single') {
               const singleSag = isCurved && curvatureRadiusPx ? sagittaPx(mw, curvatureRadiusPx) : 0;
               const startY = desiredYOffsetPx + singleSag;
               const measurementY = desiredYOffsetPx;
+              const bulkWidthPx = Math.min(mw, bulkWidthCm * pxPerCm);
+              const bulkThicknessPx = bulkThicknessCm * pxPerCm;
+              const bulkX = startX + (mw - bulkWidthPx) / 2;
+              const bulkY = measurementY - bulkThicknessPx;
               return (
                 <g>
+                  <rect x={bulkX} y={bulkY} width={bulkWidthPx} height={bulkThicknessPx} fill={monitorStroke} opacity={0.45} rx={Math.max(1, 0.5 * pxPerCm)} />
+                  {renderStandBar(startX, mw, measurementY, 0, 0, 'center')}
                   {state.showDimensions && isProExact && (
                     <>
                       <line x1={proEdgeLeft} y1={0} x2={proEdgeLeft} y2={measurementY} stroke="rgba(0,0,0,0.35)" strokeDasharray="4 3" />
@@ -461,6 +536,20 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
             const panelStartY = desiredYOffsetPx + panelSag;
             const measurementY = desiredYOffsetPx;
             const angle = o.monitor.angleDeg ?? (isCurved ? (o.monitor.screenInches === 45 ? 68 : 90) : 20);
+            const bulkThicknessPx = bulkThicknessCm * pxPerCm;
+            const bulkWidthPxLimit = Math.min(panelW, bulkWidthCm * pxPerCm);
+            const bulkY = measurementY - bulkThicknessPx;
+            const renderBulk = (panelStartX: number) => (
+              <rect
+                x={panelStartX + (panelW - bulkWidthPxLimit) / 2}
+                y={bulkY}
+                width={bulkWidthPxLimit}
+                height={bulkThicknessPx}
+                fill={monitorStroke}
+                opacity={0.45}
+                rx={Math.max(1, 0.5 * pxPerCm)}
+              />
+            );
             return (
               <g>
                 {state.showDimensions && isProExact && (
@@ -477,6 +566,8 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
                 )}
                 {/* Left panel rotated inward */}
                 <g transform={`rotate(${-angle}, ${startX + panelW}, ${panelStartY + barThicknessPx / 2})`}>
+                  {renderBulk(startX)}
+                  {renderStandBar(startX + panelW * 0.35, panelW * 0.65, measurementY, 0, standBarOverlapPx * 0.65, 'left')}
                   {isCurved && curvatureRadiusPx ? (
                     <path
                       d={describeMonitorArc(startX, panelStartY, panelW, curvatureRadiusPx, true)}
@@ -491,6 +582,8 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
                   )}
                 </g>
                 {/* Center panel */}
+                {renderBulk(startX + panelW + gapPx)}
+                {renderStandBar(startX + panelW + gapPx, panelW, measurementY, standBarOverlapPx, standBarOverlapPx, 'center')}
                 {isCurved && curvatureRadiusPx ? (
                   <path
                     d={describeMonitorArc(startX + panelW + gapPx, panelStartY, panelW, curvatureRadiusPx, true)}
@@ -505,6 +598,8 @@ export const RoomCanvas: React.FC<CanvasProps> = ({ state, dispatch, selected })
                 )}
                 {/* Right panel rotated inward */}
                 <g transform={`rotate(${angle}, ${startX + 2 * (panelW + gapPx)}, ${panelStartY + barThicknessPx / 2})`}>
+                  {renderBulk(startX + 2 * (panelW + gapPx))}
+                  {renderStandBar(startX + 2 * (panelW + gapPx), panelW * 0.65, measurementY, standBarOverlapPx * 0.65, 0, 'right')}
                   {isCurved && curvatureRadiusPx ? (
                     <path
                       d={describeMonitorArc(startX + 2 * (panelW + gapPx), panelStartY, panelW, curvatureRadiusPx, true)}
